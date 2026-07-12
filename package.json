@@ -1,0 +1,19 @@
+{
+  "name": "grilla_smash_be",
+  "version": "1.0.0",
+  "description": "backend service for grilla smash",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test"
+  },
+  "author": "kareem elsabrouty",
+  "license": "ISC",
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1",
+    "stripe": "^22.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1"
+  }
+}
