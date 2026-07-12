@@ -31,6 +31,7 @@ router.post("/create-intent", async (req, res) => {
             },
         });
 
+
         return res.json({
             success: true,
             client_secret: paymentIntent.client_secret,
@@ -44,6 +45,7 @@ router.post("/create-intent", async (req, res) => {
         return res.status(500).json({
             success: false,
             error: "Unable to create payment intent.",
+            error_message: (err as Error).message,
         });
     }
 });
