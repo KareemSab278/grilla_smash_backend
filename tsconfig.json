@@ -8,5 +8,10 @@
     "skipLibCheck": true,
     "outDir": "dist"
   },
-  "include": ["server.ts", "index.ts", "create-intent.ts", "stripe.ts"]
+  "include": [
+    "server.ts",
+    "index.ts",
+    "payments.ts",
+    "shift4.ts"
+  ]
 }
