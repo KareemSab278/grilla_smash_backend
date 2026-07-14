@@ -3,7 +3,72 @@ import { shift4Client } from "./shift4";
 
 const router = express.Router();
 
-// Called by your pay() function — POST /api/payments/charge
+const normalizeCurrency = (currency?: string) => (currency || "GBP").toUpperCase();
+
+const normalizeAmount = (amount: string | number | undefined) => {
+    if (amount === undefined || amount === null || amount === "") {
+        throw new Error("Invalid amount");
+    }
+
+    if (typeof amount === "number") {
+        if (!Number.isFinite(amount) || amount <= 0) {
+            throw new Error("Invalid amount");
+        }
+        return Math.round(amount);
+    }
+
+    const parsed = String(amount).trim();
+    if (!parsed) {
+        throw new Error("Invalid amount");
+    }
+
+    if (parsed.includes(".")) {
+        const [whole, fraction = ""] = parsed.split(".");
+        const normalizedFraction = (fraction + "00").slice(0, 2);
+        const minorUnitAmount = Number(`${whole}${normalizedFraction}`);
+
+        if (!Number.isFinite(minorUnitAmount) || minorUnitAmount <= 0) {
+            throw new Error("Invalid amount");
+        }
+
+        return minorUnitAmount;
+    }
+
+    const minorUnitAmount = Number(parsed);
+    if (!Number.isFinite(minorUnitAmount) || minorUnitAmount <= 0) {
+        throw new Error("Invalid amount");
+    }
+
+    return minorUnitAmount;
+};
+
+export const buildCheckoutRequest = ({
+    amount,
+    currency = "GBP",
+}: {
+    amount: string | number;
+    currency?: string;
+}) => {
+    const charge: Record<string, any> = {
+        amount: normalizeAmount(amount),
+        currency: normalizeCurrency(currency),
+    };
+    return { charge };
+};
+
+const buildChargeParams = ({ amount, currency, token, card, customerId }: Record<string, any>) => {
+    const chargeParams: Record<string, any> = {
+        amount: normalizeAmount(amount),
+        currency: normalizeCurrency(currency),
+    };
+
+    if (token) chargeParams.card = token;
+    if (card) chargeParams.card = card;
+    if (customerId) chargeParams.customerId = customerId;
+
+    return chargeParams;
+};
+
 router.post("/charge", async (req, res) => {
     try {
         const { amount, currency, token, card, customerId } = req.body;
@@ -15,10 +80,7 @@ router.post("/charge", async (req, res) => {
             return res.status(400).json({ success: false, error: "Currency is required" });
         }
 
-        const chargeParams: Record<string, any> = { amount, currency };
-        if (token) chargeParams.card = token;
-        if (card) chargeParams.card = card;
-        if (customerId) chargeParams.customerId = customerId;
+        const chargeParams = buildChargeParams({ amount, currency, token, card, customerId });
 
         if (!chargeParams.card) {
             return res.status(400).json({ success: false, error: "Card or token is required" });
@@ -43,22 +105,12 @@ router.post("/charge", async (req, res) => {
     }
 });
 
-// Generates clientSecret for the Shift4 checkout widget — GET /api/payments/checkout-session
 router.get("/checkout-session", (req, res) => {
     try {
-        const { amount, currency = "gbp" } = req.query;
-        const parsedAmount = parseInt(amount as string, 10);
+        const { amount, currency = "gbp" } = req.query as Record<string, any>;
+        const request = buildCheckoutRequest({ amount, currency });
 
-        if (!parsedAmount || parsedAmount <= 0) {
-            return res.status(400).json({ success: false, error: "Invalid amount" });
-        }
-
-        const clientSecret = shift4Client.checkoutRequest.sign({
-            charge: {
-                amount: parsedAmount,
-                currency: currency as string,
-            },
-        });
+        const clientSecret = shift4Client.checkoutRequest.sign(request);
 
         return res.json({ success: true, clientSecret });
     } catch (err) {
@@ -71,10 +123,10 @@ router.get("/checkout-session", (req, res) => {
     }
 });
 
-// Receives shift4ChargeId from the widget form POST — POST /api/payments/checkout-callback
 router.post("/checkout-callback", async (req, res) => {
     try {
-        const { shift4ChargeId } = req.body;
+        const body = req.body ?? {};
+        const shift4ChargeId = body.shift4ChargeId || body.chargeId || body.id || body.charge?.id;
 
         if (!shift4ChargeId) {
             return res.status(400).json({ success: false, error: "Missing shift4ChargeId" });
