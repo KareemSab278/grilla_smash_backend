@@ -11,6 +11,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/payments", payments);
 
-app.listen(3000, () => {
-    console.log("Server running on port 3000");
+app.listen(6969, () => {
+    console.log("Server running on port 6969");
 });

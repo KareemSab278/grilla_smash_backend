@@ -1,75 +1,85 @@
 import express from "express";
 import { shift4Client } from "./shift4";
+import { normalizeAmount, buildCheckoutRequest } from "./helpers";
 
 const router = express.Router();
+router.post("/charge", async (req, res) => await handleCharge(req, res));
+router.get("/checkout-session", async (req, res) => await getCheckoutSession(req, res));
+router.post("/checkout-callback", async (req, res) => await getCheckoutCallback(req, res));
 
-const normalizeCurrency = (currency?: string) => (currency || "GBP").toUpperCase();
+// ========================================
 
-const normalizeAmount = (amount: string | number | undefined) => {
-    if (amount === undefined || amount === null || amount === "") {
-        throw new Error("Invalid amount");
-    }
-
-    if (typeof amount === "number") {
-        if (!Number.isFinite(amount) || amount <= 0) {
-            throw new Error("Invalid amount");
-        }
-        return Math.round(amount);
-    }
-
-    const parsed = String(amount).trim();
-    if (!parsed) {
-        throw new Error("Invalid amount");
-    }
-
-    if (parsed.includes(".")) {
-        const [whole, fraction = ""] = parsed.split(".");
-        const normalizedFraction = (fraction + "00").slice(0, 2);
-        const minorUnitAmount = Number(`${whole}${normalizedFraction}`);
-
-        if (!Number.isFinite(minorUnitAmount) || minorUnitAmount <= 0) {
-            throw new Error("Invalid amount");
-        }
-
-        return minorUnitAmount;
-    }
-
-    const minorUnitAmount = Number(parsed);
-    if (!Number.isFinite(minorUnitAmount) || minorUnitAmount <= 0) {
-        throw new Error("Invalid amount");
-    }
-
-    return minorUnitAmount;
-};
-
-export const buildCheckoutRequest = ({
-    amount,
-    currency = "GBP",
-}: {
-    amount: string | number;
+type healthyResponse = {
+    success: boolean;
+    charge_id?: string;
+    amount?: number;
     currency?: string;
-}) => {
-    const charge: Record<string, any> = {
-        amount: normalizeAmount(amount),
-        currency: normalizeCurrency(currency),
-    };
-    return { charge };
+    status?: string;
+    error?: string;
+    error_message?: string;
 };
 
-const buildChargeParams = ({ amount, currency, token, card, customerId }: Record<string, any>) => {
-    const chargeParams: Record<string, any> = {
-        amount: normalizeAmount(amount),
-        currency: normalizeCurrency(currency),
-    };
-
-    if (token) chargeParams.card = token;
-    if (card) chargeParams.card = card;
-    if (customerId) chargeParams.customerId = customerId;
-
-    return chargeParams;
+type ErrorResponse = {
+    success?: false;
+    error?: string;
+    error_message?: Error | string;
 };
 
-router.post("/charge", async (req, res) => {
+// ========================================
+
+const errorResponse = (res: express.Response, error: string, errorMessage?: string) => {
+    return res.status(500).json({
+        success: false,
+        error,
+        error_message: errorMessage,
+    } as ErrorResponse);
+};
+
+// ========================================
+
+const getCheckoutCallback = async (req: express.Request, res: express.Response) => {
+    try {
+        const body = req.body ?? {};
+        const shift4ChargeId = body.shift4ChargeId || body.chargeId || body.id || body.charge?.id;
+
+        if (!shift4ChargeId) {
+            return res.status(400).json({ success: false, error: "Missing shift4ChargeId" });
+        }
+
+        const charge = await shift4Client.charges.get(shift4ChargeId);
+
+        const response: healthyResponse = {
+            success: true,
+            charge_id: charge.id,
+            amount: charge.amount,
+            currency: charge.currency,
+            status: charge.status,
+        };
+
+        return res.json(response);
+    } catch (err) {
+        return errorResponse(res, "Unable to verify charge.", (err as Error).message);
+    }
+};
+
+// ========================================
+
+const getCheckoutSession = async (req: express.Request, res: express.Response) => {
+    try {
+        const { amount, currency = "GBP" } = req.query as Record<string, any>;
+        const request = buildCheckoutRequest({ amount, currency });
+
+        const clientSecret = shift4Client.checkoutRequest.sign(request);
+
+        return res.json({ success: true, clientSecret });
+    } catch (err) {
+        return errorResponse(res, "Unable to create checkout session.", (err as Error).message);
+    }
+};
+
+// ========================================
+
+const handleCharge = async (req: express.Request, res: express.Response) => {
     try {
         const { amount, currency, token, card, customerId } = req.body;
 
@@ -87,68 +97,36 @@ router.post("/charge", async (req, res) => {
         }
 
         const charge = await shift4Client.charges.create(chargeParams);
-
-        return res.json({
+        const response: healthyResponse = {
             success: true,
             charge_id: charge.id,
             amount: charge.amount,
             currency: charge.currency,
             status: charge.status,
-        });
+        };
+
+        return res.json(response);
+
     } catch (err) {
-        console.error(err);
-        return res.status(500).json({
-            success: false,
-            error: "Unable to create charge.",
-            error_message: (err as Error).message,
-        });
+        errorResponse(res, "Unable to create charge.", (err as Error).message);
     }
-});
+};
 
-router.get("/checkout-session", (req, res) => {
-    try {
-        const { amount, currency = "gbp" } = req.query as Record<string, any>;
-        const request = buildCheckoutRequest({ amount, currency });
+// ========================================
 
-        const clientSecret = shift4Client.checkoutRequest.sign(request);
+const buildChargeParams = ({ amount, currency, token, card, customerId }: Record<string, any>) => {
+    const chargeParams: Record<string, any> = {
+        amount: normalizeAmount(amount),
+        currency: currency.toUpperCase(),
+    };
 
-        return res.json({ success: true, clientSecret });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({
-            success: false,
-            error: "Unable to create checkout session.",
-            error_message: (err as Error).message,
-        });
-    }
-});
+    if (token) chargeParams.card = token;
+    if (card) chargeParams.card = card;
+    if (customerId) chargeParams.customerId = customerId;
 
-router.post("/checkout-callback", async (req, res) => {
-    try {
-        const body = req.body ?? {};
-        const shift4ChargeId = body.shift4ChargeId || body.chargeId || body.id || body.charge?.id;
+    return chargeParams;
+};
 
-        if (!shift4ChargeId) {
-            return res.status(400).json({ success: false, error: "Missing shift4ChargeId" });
-        }
-
-        const charge = await shift4Client.charges.get(shift4ChargeId);
-
-        return res.json({
-            success: true,
-            charge_id: charge.id,
-            amount: charge.amount,
-            currency: charge.currency,
-            status: charge.status,
-        });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({
-            success: false,
-            error: "Unable to verify charge.",
-            error_message: (err as Error).message,
-        });
-    }
-});
+// ========================================
 
 export default router;
