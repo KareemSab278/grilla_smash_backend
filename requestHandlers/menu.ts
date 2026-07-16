@@ -1,0 +1,77 @@
+import express from "express";
+import { QUERIES } from "../queries";
+import sql from "../db";
+import { MenuResponse, MenuProduct, MenuOption } from "../types";
+
+const router = express.Router();
+
+router.get("/menu", async (req, res) => {
+    try {
+        const products = await sql.unsafe<MenuProduct[]>(QUERIES.GET.PRODUCTS);
+
+        const options = await sql.unsafe<MenuOption[]>(QUERIES.GET.EXTRAS);
+
+        const meals = await sql.unsafe<{ name: string; price: number }[]>(QUERIES.GET.MEALS);
+
+        const response: MenuResponse = {
+            products,
+
+            mealSideOptions: options.filter(
+                x => [
+                    "Fries",
+                    "Peri Fries",
+                    "Onion Rings",
+                    "Mozzarella Sticks",
+                    "Chilli Cheese Bites"
+                ].includes(x.name)
+            ),
+
+            drinkOptions: options.filter(
+                x => [
+                    "Coke",
+                    "Coke Zero",
+                    "Sprite",
+                    "Fanta",
+                    "Milk Shake"
+                ].includes(x.name)
+            ),
+
+            extrasByCategory: {
+                burgers: options.filter(
+                    x => x.category === "burgers"
+                ),
+
+                wraps: options.filter(
+                    x => x.category === "wraps"
+                ),
+
+                chicken: [
+                    {
+                        name: "Sauce",
+                        price: 0
+                    }
+                ],
+
+                "loaded-fries": options.filter(
+                    x => x.category === "loaded-fries"
+                )
+            },
+
+            mealOptions: meals.map(meal => ({
+                name: meal.name,
+                price: meal.price
+            }))
+        };
+
+        res.json(response);
+
+    } catch (err) {
+        console.error(err);
+
+        res.status(500).json({
+            error: (err as Error).message
+        });
+    }
+});
+
+export default router;

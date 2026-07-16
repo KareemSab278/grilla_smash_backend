@@ -1,11 +1,11 @@
 import express from "express";
-import { shift4Client } from "./shift4";
-import { normalizeAmount, buildCheckoutRequest } from "./helpers";
+import { shift4Client } from "../shift4";
+import { normalizeAmount, buildCheckoutRequest } from "../helpers";
 
 const router = express.Router();
-router.post("/charge", async (req, res) => await handleCharge(req, res));
-router.get("/checkout-session", async (req, res) => await getCheckoutSession(req, res));
-router.post("/checkout-callback", async (req, res) => await getCheckoutCallback(req, res));
+router.post("/payments/charge", async (req, res) => await handleCharge(req, res));
+router.get("/payments/checkout-session", async (req, res) => await getCheckoutSession(req, res));
+router.post("/payments/checkout-callback", async (req, res) => await getCheckoutCallback(req, res));
 
 // ========================================
 

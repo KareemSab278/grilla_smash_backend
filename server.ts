@@ -1,7 +1,10 @@
 import "dotenv/config";
 import express from "express";
-import payments from "./payments";
 import cors from "cors";
+
+import payments from "./requestHandlers/payments";
+import menu from "./requestHandlers/menu";
+import health from "./requestHandlers/health";
 
 const app = express();
 
@@ -9,7 +12,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api/payments", payments);
+app.use("/api", health);
+app.use("/api", payments);
+app.use("/api", menu);
+
 
 app.listen(6969, () => {
     console.log("Server running on port 6969");

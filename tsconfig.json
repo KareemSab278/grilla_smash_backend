@@ -11,7 +11,7 @@
   "include": [
     "server.ts",
     "index.ts",
-    "payments.ts",
+    "requestHandlers/payments.ts",
     "shift4.ts"
   ]
 }
