@@ -127,21 +127,66 @@ FROM branches
 WHERE LOWER(name) = LOWER($1);
 `;
 
+const getOrdersByBranchIdQuery: string = `
+SELECT
+o.id,
+    o.customer_name,
+    o.customer_phone,
+    o.order_status,
+    o.total:: float,
+        o.created_at,
+
+        json_agg(
+            json_build_object(
+                'product_id', oi.product_id,
+                'product_name', p.name,
+                'quantity', oi.quantity,
+                'price', oi.price:: float,
+                'options', (
+                SELECT json_agg(
+                    json_build_object(
+                        'option_id', oio.option_id,
+                        'name', op.name,
+                        'price', oio.price:: float
+                    )
+                )
+                FROM order_item_options oio
+                JOIN options op
+                    ON op.id = oio.option_id
+                WHERE oio.order_item_id = oi.id
+            )
+        )
+    ) AS items
+
+FROM orders o
+
+JOIN order_items oi
+    ON oi.order_id = o.id
+
+JOIN products p
+    ON p.id = oi.product_id
+
+WHERE o.branch_id = $1
+
+GROUP BY o.id
+
+ORDER BY o.created_at DESC;
+`;
 
 const getMealSidesQuery = `
 SELECT
-    id,
+id,
     name,
-    price::float
+    price:: float
 FROM meal_side_options
 ORDER BY id;
 `;
 
 const getMealDrinksQuery = `
 SELECT
-    id,
+id,
     name,
-    price::float
+    price:: float
 FROM meal_drink_options
 ORDER BY id;
 `;
@@ -154,9 +199,10 @@ export const QUERIES = {
         MEALS: getMeals,
         MEAL_SIDES: getMealSidesQuery,
         MEAL_DRINKS: getMealDrinksQuery,
-        ORDERS: getOrdersQuery,
+        ORDERS: getOrdersQuery + `; `,
         BRANCH_INFO: getStoreInfoQuery,
-        "ALL-BRANCHES": `SELECT * FROM branches;`
+        "ALL-BRANCHES": `SELECT * FROM branches; `,
+        ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
     },
 
     POST: {

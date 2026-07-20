@@ -29,8 +29,21 @@ router.get("/orders", async (_req, res) => {
 	}
 });
 
+router.get("/orders/:branchId", async (req, res) => {
+	const { branchId } = req.params;
+	try {
+		const orders = await sql.unsafe<Order[]>(QUERIES.GET.ORDERS_BY_BRANCH_ID, [branchId]);
+		return res.json({ orders });
+	} catch (err) {
+		console.error(err);
+		return res.status(500).json({
+			error: (err as Error).message,
+		});
+	}
+});
+
 router.post("/orders", async (req, res) => {
-    console.log("Received request to create order:", req.body);
+	console.log("Received request to create order:", req.body);
 	try {
 		const body = req.body as CreateOrderRequest | KdsOrderPayload;
 
@@ -93,19 +106,18 @@ router.post("/orders", async (req, res) => {
 		}
 
 		await sql`
-			INSERT INTO order_items ${
-				sql(items.map(item => ({
-					order_id: orderId,
-					product_id: item.product_id,
-					quantity: item.quantity,
-					price: item.price,
-				})))
+			INSERT INTO order_items ${sql(items.map(item => ({
+			order_id: orderId,
+			product_id: item.product_id,
+			quantity: item.quantity,
+			price: item.price,
+		})))
 			}
 		`;
 
 		return res.status(201).json({
 			order_id: orderId,
-            message: "Order created successfully"
+			message: "Order created successfully"
 		});
 	} catch (err) {
 		console.error(err);
@@ -116,7 +128,7 @@ router.post("/orders", async (req, res) => {
 });
 
 router.patch("/orders/status", async (req, res) => {
-    console.log("Received request to update order status:", req.body);
+	console.log("Received request to update order status:", req.body);
 	try {
 		const { id, status } = req.body as UpdateOrderStatusRequest;
 

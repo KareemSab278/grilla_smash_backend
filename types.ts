@@ -46,6 +46,7 @@ export type MenuResponse = {
     }[];
 };
 
+
 export type OrderItemRequest = {
     product_id: number;
     quantity: number;
