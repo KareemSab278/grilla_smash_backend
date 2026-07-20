@@ -7,6 +7,7 @@ import {
 	KdsOrderPayload,
 	Order,
 	OrdersResponse,
+	OrderStatus,
 	UpdateOrderStatusRequest,
 	UpdateOrderStatusResponse,
 } from "../types";
@@ -45,6 +46,7 @@ router.post("/orders", async (req, res) => {
 			customer_name,
 			customer_phone,
 			total,
+			order_status,
 			items,
 		} = normalizedOrder;
 
@@ -60,19 +62,35 @@ router.post("/orders", async (req, res) => {
 			});
 		}
 
-		const createdRows = await sql.unsafe<{ order_id: string }[]>(
+		const createdOrder = await sql.unsafe<{ id: string }[]>(
 			QUERIES.POST.ORDER,
 			[
 				branch_id,
 				customer_name,
 				customer_phone ?? null,
 				total,
-				JSON.stringify(items),
+				order_status ?? "pending",
 			]
 		);
 
+		const orderId = createdOrder[0]?.id;
+		if (!orderId) {
+			return res.status(500).json({ error: "Failed to create order" });
+		}
+
+		await sql`
+			INSERT INTO order_items ${
+				sql(items.map(item => ({
+					order_id: orderId,
+					product_id: item.product_id,
+					quantity: item.quantity,
+					price: item.price,
+				})))
+			}
+		`;
+
 		return res.status(201).json({
-			order_id: createdRows[0]?.order_id,
+			order_id: orderId,
             message: "Order created successfully"
 		});
 	} catch (err) {
@@ -124,6 +142,7 @@ const mapKdsPayloadToCreateOrder = (payload: KdsOrderPayload): CreateOrderReques
 		customer_name: data.customer.fullName,
 		customer_phone: payload.TEL || data.customer.phone,
 		total: Number(data.total),
+		order_status: data.status as OrderStatus,
 		items: (data.items ?? []).map((item: CartItem) => ({
 			product_id: Number(item.product?.id ?? item.id),
 			quantity: Number(item.quantity ?? 1),

@@ -80,42 +80,21 @@ ORDER BY o.created_at DESC;
 
 
 const createOrderQuery: string = `
-WITH new_order AS (
-    INSERT INTO orders (
-        branch_id,
-        customer_name,
-        customer_phone,
-        total
-    )
-    VALUES (
-        $1,
-        $2,
-        $3,
-        $4
-    )
-    RETURNING id
+INSERT INTO orders (
+    branch_id,
+    customer_name,
+    customer_phone,
+    total,
+    order_status
 )
-
-INSERT INTO order_items (
-    order_id,
-    product_id,
-    quantity,
-    price
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
 )
-SELECT
-    new_order.id,
-    item.product_id,
-    item.quantity,
-    item.price
-FROM new_order,
-json_to_recordset($5)
-AS item(
-    product_id integer,
-    quantity integer,
-    price numeric
-)
-
-RETURNING order_id;
+RETURNING id;
 `;
 
 

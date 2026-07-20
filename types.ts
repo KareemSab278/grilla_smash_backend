@@ -58,6 +58,7 @@ export type CreateOrderRequest = {
     customer_name: string;
     customer_phone?: string;
     total: number;
+    order_status?: OrderStatus;
     items: OrderItemRequest[];
 };
 
@@ -159,6 +160,7 @@ export type orderData = {
     isPickup: boolean;
     customer: customerInfo;
     storeId: number;
+    status: OrderStatus;
 };
 
 export type KdsOrderPayload = {
