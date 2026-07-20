@@ -45,6 +45,13 @@ router.post("/orders", async (req, res) => {
 			branch_id,
 			customer_name,
 			customer_phone,
+			customer_email,
+			customer_address1,
+			customer_address2,
+			customer_city,
+			customer_postcode,
+			is_pickup,
+			delivery_fee,
 			total,
 			order_status,
 			items,
@@ -68,6 +75,13 @@ router.post("/orders", async (req, res) => {
 				branch_id,
 				customer_name,
 				customer_phone ?? null,
+				customer_email ?? null,
+				customer_address1 ?? null,
+				customer_address2 ?? null,
+				customer_city ?? null,
+				customer_postcode ?? null,
+				is_pickup ?? false,
+				delivery_fee ?? null,
 				total,
 				order_status ?? "pending",
 			]
@@ -136,11 +150,19 @@ export default router;
 
 const mapKdsPayloadToCreateOrder = (payload: KdsOrderPayload): CreateOrderRequest => {
 	const data = payload.orderData;
+	const customer = data.customer;
 
 	return {
 		branch_id: String(data.storeId),
-		customer_name: data.customer.fullName,
-		customer_phone: payload.TEL || data.customer.phone,
+		customer_name: customer.fullName,
+		customer_phone: payload.TEL || customer.phone,
+		customer_email: customer.email,
+		customer_address1: customer.address1,
+		customer_address2: customer.address2,
+		customer_city: customer.city,
+		customer_postcode: customer.postcode,
+		is_pickup: data.isPickup,
+		delivery_fee: data.isPickup ? undefined : data.delivery,
 		total: Number(data.total),
 		order_status: data.status as OrderStatus,
 		items: (data.items ?? []).map((item: CartItem) => ({

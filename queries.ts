@@ -84,6 +84,13 @@ INSERT INTO orders (
     branch_id,
     customer_name,
     customer_phone,
+    customer_email,
+    customer_address1,
+    customer_address2,
+    customer_city,
+    customer_postcode,
+    is_pickup,
+    delivery_fee,
     total,
     order_status
 )
@@ -92,7 +99,14 @@ VALUES (
     $2,
     $3,
     $4,
-    $5
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12
 )
 RETURNING id;
 `;

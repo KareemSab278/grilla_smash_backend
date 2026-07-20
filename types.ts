@@ -57,6 +57,13 @@ export type CreateOrderRequest = {
     branch_id: string;
     customer_name: string;
     customer_phone?: string;
+    customer_email?: string;
+    customer_address1?: string;
+    customer_address2?: string;
+    customer_city?: string;
+    customer_postcode?: string;
+    is_pickup?: boolean;
+    delivery_fee?: number;
     total: number;
     order_status?: OrderStatus;
     items: OrderItemRequest[];
