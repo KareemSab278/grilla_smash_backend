@@ -14,9 +14,7 @@ type healthyResponse = {
     charge_id?: string;
     amount?: number;
     currency?: string;
-    status?: string;
-    error?: string;
-    error_message?: string;
+    status?: number;
 };
 
 type ErrorResponse = {

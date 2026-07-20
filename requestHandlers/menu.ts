@@ -13,28 +13,20 @@ router.get("/menu", async (req, res) => {
 
         const meals = await sql.unsafe<{ name: string; price: number }[]>(QUERIES.GET.MEALS);
 
+        const sides = await sql.unsafe<{ id: number; name: string; price: number }[]>(
+            QUERIES.GET.MEAL_SIDES
+        );
+
+        const drinks = await sql.unsafe<{ id: number; name: string; price: number }[]>(
+            QUERIES.GET.MEAL_DRINKS
+        );
+
         const response: MenuResponse = {
             products,
 
-            mealSideOptions: options.filter(
-                x => [
-                    "Fries",
-                    "Peri Fries",
-                    "Onion Rings",
-                    "Mozzarella Sticks",
-                    "Chilli Cheese Bites"
-                ].includes(x.name)
-            ),
+            mealSideOptions: sides,
 
-            drinkOptions: options.filter(
-                x => [
-                    "Coke",
-                    "Coke Zero",
-                    "Sprite",
-                    "Fanta",
-                    "Milk Shake"
-                ].includes(x.name)
-            ),
+            drinkOptions: drinks,
 
             extrasByCategory: {
                 burgers: options.filter(

@@ -128,19 +128,49 @@ RETURNING
     order_status;
 `;
 
-export const QUERIES: { [key: string]: { [key: string]: string } } = {
-    'GET': {
-        'PRODUCTS': getProductsQuery,
-        'EXTRAS': getOptions,
-        'MEALS': getMeals,
-        'ORDERS': getOrdersQuery,
+const getStoreInfoQuery: string = `
+SELECT *
+FROM branches
+WHERE LOWER(name) = LOWER($1);
+`;
+
+
+const getMealSidesQuery = `
+SELECT
+    id,
+    name,
+    price::float
+FROM meal_side_options
+ORDER BY id;
+`;
+
+const getMealDrinksQuery = `
+SELECT
+    id,
+    name,
+    price::float
+FROM meal_drink_options
+ORDER BY id;
+`;
+
+
+export const QUERIES = {
+    GET: {
+        PRODUCTS: getProductsQuery,
+        EXTRAS: getOptions,
+        MEALS: getMeals,
+        MEAL_SIDES: getMealSidesQuery,
+        MEAL_DRINKS: getMealDrinksQuery,
+        ORDERS: getOrdersQuery,
+        BRANCH_INFO: getStoreInfoQuery,
+        "ALL-BRANCHES": `SELECT * FROM branches;`
     },
 
-    'POST': {
-        'ORDER': createOrderQuery,
+    POST: {
+        ORDER: createOrderQuery,
     },
 
-    'PATCH': {
-        'ORDER_STATUS': updateOrderStatusQuery,
+    PATCH: {
+        ORDER_STATUS: updateOrderStatusQuery,
     }
-}
+};

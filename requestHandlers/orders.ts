@@ -2,7 +2,9 @@ import express from "express";
 import sql from "../db";
 import { QUERIES } from "../queries";
 import {
+	CartItem,
 	CreateOrderRequest,
+	KdsOrderPayload,
 	Order,
 	OrdersResponse,
 	UpdateOrderStatusRequest,
@@ -27,14 +29,24 @@ router.get("/orders", async (_req, res) => {
 });
 
 router.post("/orders", async (req, res) => {
+    console.log("Received request to create order:", req.body);
 	try {
+		const body = req.body as CreateOrderRequest | KdsOrderPayload;
+
+		const isKdsPayload =
+			body && typeof body === "object" && "orderData" in body;
+
+		const normalizedOrder = isKdsPayload
+			? mapKdsPayloadToCreateOrder(body as KdsOrderPayload)
+			: (body as CreateOrderRequest);
+
 		const {
 			branch_id,
 			customer_name,
 			customer_phone,
 			total,
 			items,
-		} = req.body as CreateOrderRequest;
+		} = normalizedOrder;
 
 		if (!branch_id || !customer_name || !Number.isFinite(total)) {
 			return res.status(400).json({
@@ -61,6 +73,7 @@ router.post("/orders", async (req, res) => {
 
 		return res.status(201).json({
 			order_id: createdRows[0]?.order_id,
+            message: "Order created successfully"
 		});
 	} catch (err) {
 		console.error(err);
@@ -71,6 +84,7 @@ router.post("/orders", async (req, res) => {
 });
 
 router.patch("/orders/status", async (req, res) => {
+    console.log("Received request to update order status:", req.body);
 	try {
 		const { id, status } = req.body as UpdateOrderStatusRequest;
 
@@ -101,3 +115,19 @@ router.patch("/orders/status", async (req, res) => {
 });
 
 export default router;
+
+const mapKdsPayloadToCreateOrder = (payload: KdsOrderPayload): CreateOrderRequest => {
+	const data = payload.orderData;
+
+	return {
+		branch_id: String(data.storeId),
+		customer_name: data.customer.fullName,
+		customer_phone: payload.TEL || data.customer.phone,
+		total: Number(data.total),
+		items: (data.items ?? []).map((item: CartItem) => ({
+			product_id: Number(item.product?.id ?? item.id),
+			quantity: Number(item.quantity ?? 1),
+			price: Number(item.product?.price ?? 0),
+		})),
+	};
+};

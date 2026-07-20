@@ -22,7 +22,12 @@ router.get("/orders", async (_req, res) => {
 });
 router.post("/orders", async (req, res) => {
     try {
-        const { branch_id, customer_name, customer_phone, total, items, } = req.body;
+        const body = req.body;
+        const isKdsPayload = body && typeof body === "object" && "orderData" in body;
+        const normalizedOrder = isKdsPayload
+            ? mapKdsPayloadToCreateOrder(body)
+            : body;
+        const { branch_id, customer_name, customer_phone, total, items, } = normalizedOrder;
         if (!branch_id || !customer_name || !Number.isFinite(total)) {
             return res.status(400).json({
                 error: "branch_id, customer_name and total are required",
@@ -42,6 +47,7 @@ router.post("/orders", async (req, res) => {
         ]);
         return res.status(201).json({
             order_id: createdRows[0]?.order_id,
+            message: "Order created successfully"
         });
     }
     catch (err) {
@@ -75,3 +81,17 @@ router.patch("/orders/status", async (req, res) => {
     }
 });
 exports.default = router;
+const mapKdsPayloadToCreateOrder = (payload) => {
+    const data = payload.orderData;
+    return {
+        branch_id: String(data.storeId),
+        customer_name: data.customer.fullName,
+        customer_phone: payload.TEL || data.customer.phone,
+        total: Number(data.total),
+        items: (data.items ?? []).map((item) => ({
+            product_id: Number(item.product?.id ?? item.id),
+            quantity: Number(item.quantity ?? 1),
+            price: Number(item.product?.price ?? 0),
+        })),
+    };
+};

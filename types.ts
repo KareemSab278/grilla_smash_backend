@@ -103,9 +103,71 @@ export type OrderStatus =
     | "preparing" | "ready";
 
 
-
-
 export type UpdateOrderStatusResponse = {
     id: string;
     order_status: UpdateOrderStatusRequest["status"];
+};
+
+export type Product = {
+    id: number;
+    price?: number;
+};
+
+export type Branch = {
+    id: string;
+    name: string;
+    location: string;
+    latitude: number;
+    longitude: number;
+};
+
+export type Extra = {
+    id?: number;
+    name?: string;
+    price?: number;
+};
+
+export type MealSelection = {
+    name?: string;
+    price?: number;
+};
+
+export type customerInfo = {
+    fullName: string;
+    phone: string;
+    email: string;
+    address1: string;
+    address2?: string;
+    city: string;
+    postcode: string;
+};
+
+export type CartItem = {
+    id: number;
+    product: Product;
+    quantity: number;
+    extras?: Extra[];
+    meal?: MealSelection | null;
+    sauceChoice?: string;
+};
+
+export type orderData = {
+    items: CartItem[];
+    total: number;
+    delivery: number;
+    subtotal: number;
+    isPickup: boolean;
+    customer: customerInfo;
+    storeId: number;
+};
+
+export type KdsOrderPayload = {
+    UID: string;
+    TEL: string;
+    orderData: orderData;
+};
+
+export type orderResponse = {
+    order_id: string;
+    message: string;
 };
