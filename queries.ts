@@ -42,7 +42,7 @@ SELECT
     o.order_status,
     o.total::float,
     o.created_at,
-
+    o.is_pickup,
     json_agg(
         json_build_object(
             'product_id', oi.product_id,
@@ -135,7 +135,7 @@ o.id,
     o.order_status,
     o.total:: float,
         o.created_at,
-
+        o.is_pickup,
         json_agg(
             json_build_object(
                 'product_id', oi.product_id,
