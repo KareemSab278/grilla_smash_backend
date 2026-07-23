@@ -32,63 +32,7 @@ SELECT
     name,
     price_modifier::float AS price
 FROM meal_options;`;
-const getOrdersQuery = `
-SELECT
-    o.id,
-    o.customer_name,
-    o.customer_phone,
-    o.order_status,
-    o.total::float,
-    o.created_at,
-    o.is_pickup,
-    json_agg(
-        json_build_object(
-            'product_id', oi.product_id,
-            'product_name', p.name,
-            'quantity', oi.quantity,
-            'price', oi.price::float,
-            'sauce_choice', oi.sauce_choice,
-            'meal', (
-                SELECT json_build_object(
-                    'drink_id', oim.drink_id,
-                    'drink_name', mdo.name,
-                    'side_id', oim.side_id,
-                    'side_name', mso.name
-                )
-                FROM order_item_meals oim
-                LEFT JOIN meal_drink_options mdo ON mdo.id = oim.drink_id
-                LEFT JOIN meal_side_options mso ON mso.id = oim.side_id
-                WHERE oim.order_item_id = oi.id
-            ),
-            'options', (
-                SELECT json_agg(
-                    json_build_object(
-                        'option_id', oio.option_id,
-                        'name', op.name,
-                        'price', oio.price::float
-                    )
-                )
-                FROM order_item_options oio
-                JOIN options op
-                    ON op.id = oio.option_id
-                WHERE oio.order_item_id = oi.id
-            )
-        )
-    ) AS items
-
-FROM orders o
-
-JOIN order_items oi
-    ON oi.order_id = o.id
-
-JOIN products p
-    ON p.id = oi.product_id
-    
-WHERE o.order_status != 'delivered' and o.order_status != 'cancelled' and o.order_status != 'completed'
-GROUP BY o.id
-
-ORDER BY o.created_at DESC;
-`;
+// maybe the order requires the payment ref? 
 const createOrderQuery = `
 INSERT INTO orders (
     branch_id,
@@ -133,6 +77,9 @@ SELECT *
 FROM branches
 WHERE LOWER(name) = LOWER($1);
 `;
+// orders that are delivered, refunded, or completed are not included in the query results.
+// orders that are cancelled are shown as 'REQUIRES REFUND' since it is the kitchen who cancels the order (possible overburdened kitchen, etc.) and the customer should be refunded.
+// The refund is handled by management in kitchen through shift4 anyway.
 const getOrdersByBranchIdQuery = `
 SELECT
 o.id,
@@ -186,7 +133,7 @@ JOIN products p
     ON p.id = oi.product_id
 
 WHERE o.branch_id = $1
-AND o.order_status != 'delivered' and o.order_status != 'cancelled' and o.order_status != 'completed'
+AND o.order_status != 'delivered' and o.order_status != 'refunded' and o.order_status != 'completed'
 GROUP BY o.id
 
 ORDER BY o.created_at DESC;
@@ -214,7 +161,6 @@ exports.QUERIES = {
         MEALS: getMeals,
         MEAL_SIDES: getMealSidesQuery,
         MEAL_DRINKS: getMealDrinksQuery,
-        ORDERS: getOrdersQuery + `; `,
         BRANCH_INFO: getStoreInfoQuery,
         "ALL-BRANCHES": `SELECT * FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,

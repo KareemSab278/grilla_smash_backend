@@ -72,6 +72,7 @@ export type CreateOrderRequest = {
     total: number;
     order_status?: OrderStatus;
     items: OrderItemRequest[];
+    payment_id: string;
 };
 
 
@@ -112,7 +113,7 @@ export type OrdersResponse = {
     orders: Order[];
 };
 
-export type OrderStatus = "received" | "preparing" | "ready" | "delivered" | "completed";
+export type OrderStatus = "received" | "preparing" | "ready" | "delivered" | "completed" | "refunded" | "cancelled";
 
 export type UpdateOrderStatusResponse = {
     id: string;
@@ -183,6 +184,7 @@ export type KdsOrderPayload = {
     UID: string;
     TEL: string;
     orderData: orderData;
+    paymentId?: string;
 };
 
 export type orderResponse = {

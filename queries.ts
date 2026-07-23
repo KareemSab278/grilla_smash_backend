@@ -35,7 +35,6 @@ SELECT
 FROM meal_options;`
 
 
-// maybe the order requires the payment ref? 
 const createOrderQuery: string = `
 INSERT INTO orders (
     branch_id,
@@ -49,7 +48,8 @@ INSERT INTO orders (
     is_pickup,
     delivery_fee,
     total,
-    order_status
+    order_status,
+    payment_id
 )
 VALUES (
     $1,
@@ -63,7 +63,8 @@ VALUES (
     $9,
     $10,
     $11,
-    $12
+    $12,
+    $13
 )
 RETURNING id;
 `;
@@ -95,6 +96,7 @@ o.id,
     o.customer_name,
     o.customer_phone,
     o.order_status,
+    o.payment_id,
     o.total:: float,
         o.created_at,
         o.is_pickup,

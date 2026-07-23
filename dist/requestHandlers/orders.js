@@ -7,19 +7,6 @@ const express_1 = __importDefault(require("express"));
 const db_1 = __importDefault(require("../db"));
 const queries_1 = require("../queries");
 const router = express_1.default.Router();
-router.get("/orders", async (_req, res) => {
-    try {
-        const orders = await db_1.default.unsafe(queries_1.QUERIES.GET.ORDERS);
-        const response = { orders };
-        return res.json(response);
-    }
-    catch (err) {
-        console.error(err);
-        return res.status(500).json({
-            error: err.message,
-        });
-    }
-});
 router.get("/orders/:branchId", async (req, res) => {
     const { branchId } = req.params;
     try {
