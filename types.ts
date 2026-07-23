@@ -51,6 +51,8 @@ export type OrderItemRequest = {
     product_id: number;
     quantity: number;
     price: number;
+    extras?: { id: number; price: number }[];
+    sauce_choice?: string;
 };
 
 
@@ -83,6 +85,7 @@ export type OrderItem = {
     product_name: string;
     quantity: number;
     price: number;
+    sauce_choice: string | null;
     options: OrderItemOption[] | null;
 };
 

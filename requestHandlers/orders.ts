@@ -105,15 +105,28 @@ router.post("/orders", async (req, res) => {
 			return res.status(500).json({ error: "Failed to create order" });
 		}
 
-		await sql`
+		const insertedItems = await sql<{ id: string }[]>`
 			INSERT INTO order_items ${sql(items.map(item => ({
 			order_id: orderId,
 			product_id: item.product_id,
 			quantity: item.quantity,
 			price: item.price,
-		})))
-			}
+			sauce_choice: item.sauce_choice ?? null,
+		})))}
+			RETURNING id
 		`;
+
+		const orderItemOptions = insertedItems.flatMap((insertedItem, index) =>
+			(items[index].extras ?? []).map(extra => ({
+				order_item_id: insertedItem.id,
+				option_id: extra.id,
+				price: extra.price,
+			}))
+		);
+
+		if (orderItemOptions.length > 0) {
+			await sql`INSERT INTO order_item_options ${sql(orderItemOptions)}`;
+		}
 
 		return res.status(201).json({
 			order_id: orderId,
@@ -181,6 +194,8 @@ const mapKdsPayloadToCreateOrder = (payload: KdsOrderPayload): CreateOrderReques
 			product_id: Number(item.product?.id ?? item.id),
 			quantity: Number(item.quantity ?? 1),
 			price: Number(item.product?.price ?? 0),
+			extras: item.extras?.filter(e => e.id != null).map(e => ({ id: e.id!, price: e.price ?? 0 })),
+			sauce_choice: item.sauceChoice ?? undefined,
 		})),
 	};
 };

@@ -49,6 +49,7 @@ SELECT
             'product_name', p.name,
             'quantity', oi.quantity,
             'price', oi.price::float,
+            'sauce_choice', oi.sauce_choice,
             'options', (
                 SELECT json_agg(
                     json_build_object(
@@ -142,6 +143,7 @@ o.id,
                 'product_name', p.name,
                 'quantity', oi.quantity,
                 'price', oi.price:: float,
+                'sauce_choice', oi.sauce_choice,
                 'options', (
                 SELECT json_agg(
                     json_build_object(
