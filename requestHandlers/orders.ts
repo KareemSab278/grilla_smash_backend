@@ -14,21 +14,6 @@ import {
 
 const router = express.Router();
 
-router.get("/orders", async (_req, res) => {
-	try {
-		const orders = await sql.unsafe<Order[]>(QUERIES.GET.ORDERS);
-
-		const response: OrdersResponse = { orders };
-
-		return res.json(response);
-	} catch (err) {
-		console.error(err);
-		return res.status(500).json({
-			error: (err as Error).message,
-		});
-	}
-});
-
 router.get("/orders/:branchId", async (req, res) => {
 	const { branchId } = req.params;
 	try {
