@@ -51,6 +51,18 @@ SELECT
             'quantity', oi.quantity,
             'price', oi.price::float,
             'sauce_choice', oi.sauce_choice,
+            'meal', (
+                SELECT json_build_object(
+                    'drink_id', oim.drink_id,
+                    'drink_name', mdo.name,
+                    'side_id', oim.side_id,
+                    'side_name', mso.name
+                )
+                FROM order_item_meals oim
+                LEFT JOIN meal_drink_options mdo ON mdo.id = oim.drink_id
+                LEFT JOIN meal_side_options mso ON mso.id = oim.side_id
+                WHERE oim.order_item_id = oi.id
+            ),
             'options', (
                 SELECT json_agg(
                     json_build_object(
@@ -145,6 +157,18 @@ o.id,
                 'quantity', oi.quantity,
                 'price', oi.price:: float,
                 'sauce_choice', oi.sauce_choice,
+                'meal', (
+                SELECT json_build_object(
+                    'drink_id', oim.drink_id,
+                    'drink_name', mdo.name,
+                    'side_id', oim.side_id,
+                    'side_name', mso.name
+                )
+                FROM order_item_meals oim
+                LEFT JOIN meal_drink_options mdo ON mdo.id = oim.drink_id
+                LEFT JOIN meal_side_options mso ON mso.id = oim.side_id
+                WHERE oim.order_item_id = oi.id
+            ),
                 'options', (
                 SELECT json_agg(
                     json_build_object(

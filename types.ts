@@ -54,6 +54,7 @@ export type OrderItemRequest = {
     price: number;
     extras?: { id: number; price: number }[];
     sauce_choice?: string;
+    meal?: MealSelection | null;
 };
 
 
@@ -87,6 +88,7 @@ export type OrderItem = {
     quantity: number;
     price: number;
     sauce_choice: string | null;
+    meal: { drink_id: number; drink_name: string; side_id: number; side_name: string } | null;
     options: OrderItemOption[] | null;
 };
 
@@ -140,9 +142,15 @@ export type Extra = {
     price?: number;
 };
 
+export type MealOption = {
+    id: number;
+    name: string;
+    price: number;
+};
+
 export type MealSelection = {
-    name?: string;
-    price?: number;
+    drink: MealOption;
+    side: MealOption;
 };
 
 export type customerInfo = {

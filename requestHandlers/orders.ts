@@ -128,6 +128,22 @@ router.post("/orders", async (req, res) => {
 			await sql`INSERT INTO order_item_options ${sql(orderItemOptions)}`;
 		}
 
+		const orderItemMeals = insertedItems
+			.map((insertedItem, index) => {
+				const meal = items[index].meal;
+				if (!meal) return null;
+				return {
+					order_item_id: insertedItem.id,
+					drink_id: meal.drink.id,
+					side_id: meal.side.id,
+				};
+			})
+			.filter((m): m is NonNullable<typeof m> => m !== null);
+
+		if (orderItemMeals.length > 0) {
+			await sql`INSERT INTO order_item_meals ${sql(orderItemMeals)}`;
+		}
+
 		return res.status(201).json({
 			order_id: orderId,
 			message: "Order created successfully"
@@ -196,6 +212,7 @@ const mapKdsPayloadToCreateOrder = (payload: KdsOrderPayload): CreateOrderReques
 			price: Number(item.product?.price ?? 0),
 			extras: item.extras?.filter(e => e.id != null).map(e => ({ id: e.id!, price: e.price ?? 0 })),
 			sauce_choice: item.sauceChoice ?? undefined,
+			meal: item.meal ?? null,
 		})),
 	};
 };
