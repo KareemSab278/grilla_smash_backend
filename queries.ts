@@ -16,6 +16,7 @@ ORDER BY p.id;`
 
 const getOptions: string = `
 SELECT
+    o.id,
     c.name AS category,
     o.name,
     o.price::float,

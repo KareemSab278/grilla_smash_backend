@@ -3,7 +3,7 @@
   "orderData": {
     "items": [
       {
-        "id": 1784832238551,
+        "id": 1784833362390,
         "product": {
           "id": 2,
           "name": "Oklahoma Burger",
@@ -15,24 +15,181 @@
         },
         "quantity": 1,
         "extras": [
-          { "id": 1, "name": "Cheese", "price": 0.5, "category": "burgers" },
-          { "id": 2, "name": "Turkey Bacon", "price": 0.75, "category": "burgers" },
-          { "id": 3, "name": "Onions", "price": 0.25, "category": "burgers" },
-          { "id": 4, "name": "Lettuce", "price": 0.25, "category": "burgers" },
-          { "id": 5, "name": "Pickles", "price": 0.25, "category": "burgers" },
-          { "id": 6, "name": "Jalapeños", "price": 0.25, "category": "burgers" },
-          { "id": 8, "name": "Go Chimp (+2.5 oz Beef)", "price": 2.0, "category": "burgers" },
-          { "id": 10, "name": "Extra Smash Sauce", "price": 0.5, "category": "burgers" },
-          { "id": 11, "name": "Extra Honey Mustard Sauce", "price": 0.5, "category": "burgers" },
-          { "id": 12, "name": "Extra Cheese", "price": 0.5, "category": "burgers" }
+          {
+            "name": "Cheese",
+            "price": 0.5,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Turkey Bacon",
+            "price": 0.75,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Onions",
+            "price": 0.25,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Lettuce",
+            "price": 0.25,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Pickles",
+            "price": 0.25,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Jalapeños",
+            "price": 0.25,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Go Ape (+5 oz Beef)",
+            "price": 4,
+            "category": "burgers",
+            "is_protein": true,
+            "isProtein": true
+          },
+          {
+            "name": "Extra Smash Sauce",
+            "price": 0.5,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Extra Honey Mustard Sauce",
+            "price": 0.5,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Extra Cheese",
+            "price": 0.5,
+            "category": "burgers",
+            "is_protein": false,
+            "isProtein": false
+          }
         ],
         "meal": {
-          "drink": { "id": 2, "name": "Diet Coke", "price": 1.5 },
-          "side": { "id": 2, "name": "Onion Rings", "price": 1.5 }
+          "drink": {
+            "id": 2,
+            "name": "Diet Coke",
+            "price": 1.5
+          },
+          "side": {
+            "id": 3,
+            "name": "Loaded Fries",
+            "price": 2.5
+          }
         }
       },
       {
-        "id": 1784832252741,
+        "id": 1784833375797,
+        "product": {
+          "id": 3,
+          "name": "Nacho Smash",
+          "category": "burgers",
+          "price": 5.99,
+          "description": "Smashed beef patty topped with nachos, cheese sauce and jalapeños.",
+          "image": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=500&h=400&fit=crop",
+          "popular": true
+        },
+        "quantity": 1
+      },
+      {
+        "id": 1784833380877,
+        "product": {
+          "id": 11,
+          "name": "Chicken Loaded Fries",
+          "category": "loaded-fries",
+          "price": 5.49,
+          "description": "Fries topped with grilled chicken, cheese sauce and jalapeños.",
+          "image": "https://images.unsplash.com/photo-1520072959219-c595dc870360?w=500&h=400&fit=crop",
+          "popular": false
+        },
+        "quantity": 1,
+        "extras": [
+          {
+            "name": "Jalapeños",
+            "price": 0.25,
+            "category": "loaded-fries",
+            "is_protein": false,
+            "isProtein": false
+          },
+          {
+            "name": "Go Grilla (+1 Chicken Patty)",
+            "price": 2,
+            "category": "loaded-fries",
+            "is_protein": true,
+            "isProtein": true
+          },
+          {
+            "name": "Extra Cheese",
+            "price": 0.5,
+            "category": "loaded-fries",
+            "is_protein": false,
+            "isProtein": false
+          }
+        ],
+        "meal": null
+      },
+      {
+        "id": 1784833390308,
+        "product": {
+          "id": 14,
+          "name": "Peri Fries",
+          "category": "sides",
+          "price": 2.99,
+          "description": "Fries tossed in peri-peri seasoning.",
+          "image": "https://images.unsplash.com/photo-1630384060421-cb20d0e0649d?w=500&h=400&fit=crop",
+          "popular": false
+        },
+        "quantity": 1
+      },
+      {
+        "id": 1784833391524,
+        "product": {
+          "id": 15,
+          "name": "Onion Rings",
+          "category": "sides",
+          "price": 2.99,
+          "description": "Crispy battered onion rings.",
+          "image": "https://images.unsplash.com/photo-1639024471283-03518883512d?w=500&h=400&fit=crop",
+          "popular": false
+        },
+        "quantity": 1
+      },
+      {
+        "id": 1784833393548,
+        "product": {
+          "id": 17,
+          "name": "Coke Zero",
+          "category": "drinks",
+          "price": 1.49,
+          "description": "330ml can. No sugar.",
+          "image": "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&h=400&fit=crop",
+          "popular": false
+        },
+        "quantity": 1
+      },
+      {
+        "id": 1784833399539,
         "product": {
           "id": 6,
           "name": "Half Chicken",
@@ -43,19 +200,27 @@
           "popular": false
         },
         "quantity": 1,
-        "sauceChoice": "Wild",
+        "sauceChoice": "Mild",
         "meal": {
-          "drink": { "id": 2, "name": "Diet Coke", "price": 1.5 },
-          "side": { "id": 2, "name": "Onion Rings", "price": 1.5 }
+          "drink": {
+            "id": 1,
+            "name": "Coke",
+            "price": 1.5
+          },
+          "side": {
+            "id": 1,
+            "name": "Fries",
+            "price": 0
+          }
         }
       }
     ],
-    "total": 40.730000000000004,
+    "total": 63.930000000000014,
     "delivery": 10,
-    "subtotal": 30.730000000000004,
+    "subtotal": 53.930000000000014,
     "isPickup": false,
     "customer": {
-      "fullName": "1 1",
+      "fullName": "somebody iusedtoknow",
       "phone": "012345679",
       "email": "kareemsab278@gmail.com",
       "address1": "address 1 tester",
@@ -66,5 +231,5 @@
     "storeId": "6a9d43ca-acbc-4290-95bc-2f3b0cc6bba0",
     "status": "pending"
   },
-  "paymentId": "char_jiuKMG2fFt9fFuoBNSiZjEL7"
+  "paymentId": "char_mWPCuSsclwFcq9gvglo7gs1C"
 }

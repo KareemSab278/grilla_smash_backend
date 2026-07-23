@@ -10,6 +10,7 @@ export type MenuProduct = {
 
 
 export type MenuOption = {
+    id: number;
     name: string;
     price: number;
     is_protein?: boolean;
