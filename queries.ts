@@ -93,10 +93,14 @@ WHERE LOWER(name) = LOWER($1);
 const getOrdersByBranchIdQuery: string = `
 SELECT
 o.id,
-    o.customer_name,
+       o.customer_name,
     o.customer_phone,
     o.order_status,
     o.payment_id,
+    o.customer_city,
+    o.customer_postcode,
+    o.customer_address1,
+    o.customer_address2,
     o.total:: float,
         o.created_at,
         o.is_pickup,
