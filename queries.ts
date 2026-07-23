@@ -86,7 +86,8 @@ JOIN order_items oi
 
 JOIN products p
     ON p.id = oi.product_id
-
+    
+WHERE o.order_status != 'delivered' and o.order_status != 'cancelled' and o.order_status != 'completed'
 GROUP BY o.id
 
 ORDER BY o.created_at DESC;
@@ -194,7 +195,7 @@ JOIN products p
     ON p.id = oi.product_id
 
 WHERE o.branch_id = $1
-
+AND o.order_status != 'delivered' and o.order_status != 'cancelled' and o.order_status != 'completed'
 GROUP BY o.id
 
 ORDER BY o.created_at DESC;

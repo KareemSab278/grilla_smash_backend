@@ -12,22 +12,12 @@ router.get("/menu", async (req, res) => {
         const products = await db_1.default.unsafe(queries_1.QUERIES.GET.PRODUCTS);
         const options = await db_1.default.unsafe(queries_1.QUERIES.GET.EXTRAS);
         const meals = await db_1.default.unsafe(queries_1.QUERIES.GET.MEALS);
+        const sides = await db_1.default.unsafe(queries_1.QUERIES.GET.MEAL_SIDES);
+        const drinks = await db_1.default.unsafe(queries_1.QUERIES.GET.MEAL_DRINKS);
         const response = {
             products,
-            mealSideOptions: options.filter(x => [
-                "Fries",
-                "Peri Fries",
-                "Onion Rings",
-                "Mozzarella Sticks",
-                "Chilli Cheese Bites"
-            ].includes(x.name)),
-            drinkOptions: options.filter(x => [
-                "Coke",
-                "Coke Zero",
-                "Sprite",
-                "Fanta",
-                "Milk Shake"
-            ].includes(x.name)),
+            mealSideOptions: sides,
+            drinkOptions: drinks,
             extrasByCategory: {
                 burgers: options.filter(x => x.category === "burgers"),
                 wraps: options.filter(x => x.category === "wraps"),

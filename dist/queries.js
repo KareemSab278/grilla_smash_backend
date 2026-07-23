@@ -17,6 +17,7 @@ WHERE p.active = true
 ORDER BY p.id;`;
 const getOptions = `
 SELECT
+    o.id,
     c.name AS category,
     o.name,
     o.price::float,
@@ -39,13 +40,26 @@ SELECT
     o.order_status,
     o.total::float,
     o.created_at,
-
+    o.is_pickup,
     json_agg(
         json_build_object(
             'product_id', oi.product_id,
             'product_name', p.name,
             'quantity', oi.quantity,
             'price', oi.price::float,
+            'sauce_choice', oi.sauce_choice,
+            'meal', (
+                SELECT json_build_object(
+                    'drink_id', oim.drink_id,
+                    'drink_name', mdo.name,
+                    'side_id', oim.side_id,
+                    'side_name', mso.name
+                )
+                FROM order_item_meals oim
+                LEFT JOIN meal_drink_options mdo ON mdo.id = oim.drink_id
+                LEFT JOIN meal_side_options mso ON mso.id = oim.side_id
+                WHERE oim.order_item_id = oi.id
+            ),
             'options', (
                 SELECT json_agg(
                     json_build_object(
@@ -69,48 +83,42 @@ JOIN order_items oi
 
 JOIN products p
     ON p.id = oi.product_id
-
+    
+WHERE o.order_status != 'delivered' and o.order_status != 'cancelled' and o.order_status != 'completed'
 GROUP BY o.id
 
 ORDER BY o.created_at DESC;
 `;
 const createOrderQuery = `
-WITH new_order AS (
-    INSERT INTO orders (
-        branch_id,
-        customer_name,
-        customer_phone,
-        total
-    )
-    VALUES (
-        $1,
-        $2,
-        $3,
-        $4
-    )
-    RETURNING id
+INSERT INTO orders (
+    branch_id,
+    customer_name,
+    customer_phone,
+    customer_email,
+    customer_address1,
+    customer_address2,
+    customer_city,
+    customer_postcode,
+    is_pickup,
+    delivery_fee,
+    total,
+    order_status
 )
-
-INSERT INTO order_items (
-    order_id,
-    product_id,
-    quantity,
-    price
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12
 )
-SELECT
-    new_order.id,
-    item.product_id,
-    item.quantity,
-    item.price
-FROM new_order,
-json_to_recordset($5)
-AS item(
-    product_id integer,
-    quantity integer,
-    price numeric
-)
-
-RETURNING order_id;
+RETURNING id;
 `;
 const updateOrderStatusQuery = `
 UPDATE orders
@@ -120,17 +128,101 @@ RETURNING
     id,
     order_status;
 `;
+const getStoreInfoQuery = `
+SELECT *
+FROM branches
+WHERE LOWER(name) = LOWER($1);
+`;
+const getOrdersByBranchIdQuery = `
+SELECT
+o.id,
+    o.customer_name,
+    o.customer_phone,
+    o.order_status,
+    o.total:: float,
+        o.created_at,
+        o.is_pickup,
+        json_agg(
+            json_build_object(
+                'product_id', oi.product_id,
+                'product_name', p.name,
+                'quantity', oi.quantity,
+                'price', oi.price:: float,
+                'sauce_choice', oi.sauce_choice,
+                'meal', (
+                SELECT json_build_object(
+                    'drink_id', oim.drink_id,
+                    'drink_name', mdo.name,
+                    'side_id', oim.side_id,
+                    'side_name', mso.name
+                )
+                FROM order_item_meals oim
+                LEFT JOIN meal_drink_options mdo ON mdo.id = oim.drink_id
+                LEFT JOIN meal_side_options mso ON mso.id = oim.side_id
+                WHERE oim.order_item_id = oi.id
+            ),
+                'options', (
+                SELECT json_agg(
+                    json_build_object(
+                        'option_id', oio.option_id,
+                        'name', op.name,
+                        'price', oio.price:: float
+                    )
+                )
+                FROM order_item_options oio
+                JOIN options op
+                    ON op.id = oio.option_id
+                WHERE oio.order_item_id = oi.id
+            )
+        )
+    ) AS items
+
+FROM orders o
+
+JOIN order_items oi
+    ON oi.order_id = o.id
+
+JOIN products p
+    ON p.id = oi.product_id
+
+WHERE o.branch_id = $1
+AND o.order_status != 'delivered' and o.order_status != 'cancelled' and o.order_status != 'completed'
+GROUP BY o.id
+
+ORDER BY o.created_at DESC;
+`;
+const getMealSidesQuery = `
+SELECT
+id,
+    name,
+    price:: float
+FROM meal_side_options
+ORDER BY id;
+`;
+const getMealDrinksQuery = `
+SELECT
+id,
+    name,
+    price:: float
+FROM meal_drink_options
+ORDER BY id;
+`;
 exports.QUERIES = {
-    'GET': {
-        'PRODUCTS': getProductsQuery,
-        'EXTRAS': getOptions,
-        'MEALS': getMeals,
-        'ORDERS': getOrdersQuery,
+    GET: {
+        PRODUCTS: getProductsQuery,
+        EXTRAS: getOptions,
+        MEALS: getMeals,
+        MEAL_SIDES: getMealSidesQuery,
+        MEAL_DRINKS: getMealDrinksQuery,
+        ORDERS: getOrdersQuery + `; `,
+        BRANCH_INFO: getStoreInfoQuery,
+        "ALL-BRANCHES": `SELECT * FROM branches; `,
+        ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
     },
-    'POST': {
-        'ORDER': createOrderQuery,
+    POST: {
+        ORDER: createOrderQuery,
     },
-    'PATCH': {
-        'ORDER_STATUS': updateOrderStatusQuery,
+    PATCH: {
+        ORDER_STATUS: updateOrderStatusQuery,
     }
 };

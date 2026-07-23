@@ -112,11 +112,7 @@ export type OrdersResponse = {
     orders: Order[];
 };
 
-export type OrderStatus =
-    | "confirmed" | "pending"
-    | "completed" | "cancelled"
-    | "preparing" | "ready";
-
+export type OrderStatus = "received" | "preparing" | "ready" | "delivered" | "completed";
 
 export type UpdateOrderStatusResponse = {
     id: string;
