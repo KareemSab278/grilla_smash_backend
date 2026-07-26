@@ -6,9 +6,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const db_1 = __importDefault(require("../db"));
 const queries_1 = require("../queries");
+const helpers_1 = require("../helpers");
 const router = express_1.default.Router();
 router.get("/orders/:branchId", async (req, res) => {
     const { branchId } = req.params;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+    const rawKey = authHeader.slice(7);
+    const [branch] = await db_1.default.unsafe(queries_1.QUERIES.GET.BRANCH_KEY, [branchId]);
+    if (!branch?.branch_key || !(0, helpers_1.keysMatch)(rawKey, branch.branch_key)) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
     try {
         const orders = await db_1.default.unsafe(queries_1.QUERIES.GET.ORDERS_BY_BRANCH_ID, [branchId]);
         return res.json({ orders });
@@ -28,7 +38,8 @@ router.post("/orders", async (req, res) => {
         const normalizedOrder = isKdsPayload
             ? mapKdsPayloadToCreateOrder(body)
             : body;
-        const { branch_id, customer_name, customer_phone, customer_email, customer_address1, customer_address2, customer_city, customer_postcode, is_pickup, delivery_fee, total, order_status, items, } = normalizedOrder;
+        const { branch_id, customer_name, customer_phone, customer_email, customer_address1, customer_address2, customer_city, customer_postcode, is_pickup, delivery_fee, total, order_status, items, payment_id: paymentId // REQUIRED: Ensure payment_id is included in the normalized order.
+         } = normalizedOrder;
         if (!branch_id || !customer_name || !Number.isFinite(total)) {
             return res.status(400).json({
                 error: "branch_id, customer_name and total are required",
@@ -52,6 +63,7 @@ router.post("/orders", async (req, res) => {
             delivery_fee ?? null,
             total,
             order_status ?? "pending",
+            paymentId
         ]);
         const orderId = createdOrder[0]?.id;
         if (!orderId) {
@@ -111,6 +123,15 @@ router.patch("/orders/status", async (req, res) => {
                 error: "id and status are required",
             });
         }
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith("Bearer ")) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const rawKey = authHeader.slice(7);
+        const [orderBranch] = await db_1.default.unsafe(queries_1.QUERIES.GET.BRANCH_KEY_BY_ORDER, [id]);
+        if (!orderBranch?.branch_key || !(0, helpers_1.keysMatch)(rawKey, orderBranch.branch_key)) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
         const updated = await db_1.default.unsafe(queries_1.QUERIES.PATCH.ORDER_STATUS, [id, status]);
         if (!updated[0]) {
             return res.status(404).json({
@@ -143,6 +164,7 @@ const mapKdsPayloadToCreateOrder = (payload) => {
         delivery_fee: data.isPickup ? undefined : data.delivery,
         total: Number(data.total),
         order_status: data.status,
+        payment_id: payload.paymentId ?? "ERROR GETTING PAYMENT ID", // REQUIRED: Ensure payment_id is included in the normalized order.
         items: (data.items ?? []).map((item) => ({
             product_id: Number(item.product?.id ?? item.id),
             quantity: Number(item.quantity ?? 1),

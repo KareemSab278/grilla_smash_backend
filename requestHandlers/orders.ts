@@ -1,6 +1,7 @@
 import express from "express";
 import sql from "../db";
 import { QUERIES } from "../queries";
+import { keysMatch } from "../helpers";
 import {
 	CartItem,
 	CreateOrderRequest,
@@ -15,6 +16,17 @@ const router = express.Router();
 
 router.get("/orders/:branchId", async (req, res) => {
 	const { branchId } = req.params;
+	const authHeader = req.headers.authorization;
+	if (!authHeader?.startsWith("Bearer ")) {
+		return res.status(401).json({ error: "Unauthorized" });
+	}
+	const rawKey = authHeader.slice(7);
+	const [branch] = await sql.unsafe<{ branch_key: string }[]>(
+		QUERIES.GET.BRANCH_KEY, [branchId]
+	);
+	if (!branch?.branch_key || !keysMatch(rawKey, branch.branch_key)) {
+		return res.status(401).json({ error: "Unauthorized" });
+	}
 	try {
 		const orders = await sql.unsafe<Order[]>(QUERIES.GET.ORDERS_BY_BRANCH_ID, [branchId]);
 		return res.json({ orders });
@@ -143,6 +155,7 @@ router.post("/orders", async (req, res) => {
 });
 
 router.patch("/orders/status", async (req, res) => {
+
 	console.log("Received request to update order status:", req.body);
 	try {
 		const { id, status } = req.body as UpdateOrderStatusRequest;
@@ -152,6 +165,19 @@ router.patch("/orders/status", async (req, res) => {
 				error: "id and status are required",
 			});
 		}
+
+		const authHeader = req.headers.authorization;
+		if (!authHeader?.startsWith("Bearer ")) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
+		const rawKey = authHeader.slice(7);
+		const [orderBranch] = await sql.unsafe<{ branch_key: string }[]>(
+			QUERIES.GET.BRANCH_KEY_BY_ORDER, [id]
+		);
+		if (!orderBranch?.branch_key || !keysMatch(rawKey, orderBranch.branch_key)) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
+
 
 		const updated = await sql.unsafe<UpdateOrderStatusResponse[]>(
 			QUERIES.PATCH.ORDER_STATUS,

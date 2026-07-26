@@ -7,6 +7,7 @@ import menu from "./requestHandlers/menu";
 import health from "./requestHandlers/health";
 import orders from "./requestHandlers/orders";
 import route from "./requestHandlers/route";
+import email from "./requestHandlers/email";
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use("/api", payments);
 app.use("/api", menu);
 app.use("/api", orders);
 app.use("/api", route);
+app.use("/api", email);
 
 
 app.listen(6969, () => {

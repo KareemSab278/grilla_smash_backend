@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.buildCheckoutRequest = exports.normalizeAmount = void 0;
+exports.keysMatch = exports.buildCheckoutRequest = exports.normalizeAmount = void 0;
+const crypto_1 = __importDefault(require("crypto"));
 const normalizeAmount = (amount) => {
     if (amount === undefined || amount === null || amount === "") {
         throw new Error("Invalid amount");
@@ -39,3 +43,11 @@ const buildCheckoutRequest = ({ amount, currency = "GBP" }) => {
     return { charge };
 };
 exports.buildCheckoutRequest = buildCheckoutRequest;
+const keysMatch = (rawKey, storedHash) => {
+    const hashed = Buffer.from(crypto_1.default.createHash("sha256").update(rawKey).digest("hex"));
+    const stored = Buffer.from(storedHash);
+    if (hashed.length !== stored.length)
+        return false;
+    return crypto_1.default.timingSafeEqual(hashed, stored);
+};
+exports.keysMatch = keysMatch;

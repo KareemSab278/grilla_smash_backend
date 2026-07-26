@@ -1,3 +1,6 @@
+import crypto from "crypto";
+
+
 export const normalizeAmount = (amount: string | number | undefined) => {
     if (amount === undefined || amount === null || amount === "") {
         throw new Error("Invalid amount");
@@ -46,3 +49,12 @@ export const buildCheckoutRequest = ({ amount, currency = "GBP" }: {
     return { charge };
 };
 
+
+export const keysMatch = (rawKey: string, storedHash: string): boolean => {
+    const hashed = Buffer.from(
+        crypto.createHash("sha256").update(rawKey).digest("hex")
+    );
+    const stored = Buffer.from(storedHash);
+    if (hashed.length !== stored.length) return false;
+    return crypto.timingSafeEqual(hashed, stored);
+};

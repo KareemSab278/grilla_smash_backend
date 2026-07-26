@@ -80,15 +80,22 @@ RETURNING
 `;
 
 const getStoreInfoQuery: string = `
-SELECT *
+SELECT id, name, location, latitude, longitude, created_at
 FROM branches
 WHERE LOWER(name) = LOWER($1);
 `;
 
 
-// orders that are delivered, refunded, or completed are not included in the query results.
-// orders that are cancelled are shown as 'REQUIRES REFUND' since it is the kitchen who cancels the order (possible overburdened kitchen, etc.) and the customer should be refunded.
-// The refund is handled by management in kitchen through shift4 anyway.
+const getBranchKeyByBranchIdQuery = `
+    SELECT branch_key FROM branches WHERE id = $1;
+`;
+
+const getBranchKeyByOrderIdQuery = `
+    SELECT b.branch_key
+    FROM orders o
+    JOIN branches b ON b.id::text = o.branch_id::text
+    WHERE o.id = $1;
+`;
 
 const getOrdersByBranchIdQuery: string = `
 SELECT
@@ -183,6 +190,8 @@ export const QUERIES = {
         BRANCH_INFO: getStoreInfoQuery,
         "ALL-BRANCHES": `SELECT * FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
+        BRANCH_KEY: getBranchKeyByBranchIdQuery,
+        BRANCH_KEY_BY_ORDER: getBranchKeyByOrderIdQuery,
     },
 
     POST: {
