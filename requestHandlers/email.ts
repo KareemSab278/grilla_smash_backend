@@ -13,7 +13,7 @@ interface EmailParams {
     title: string;
     message: string;
 }
-
+// maybe this shouldnt be a route and just let the backend handle it all. 
 router.post("/email/send", async (req, res) => {
     const { to, subject, title, message }: EmailParams = req.body;
 
@@ -31,7 +31,7 @@ router.post("/email/send", async (req, res) => {
     }
 });
 
-const sendEmail = async ({ to, subject, title, message }: EmailParams) => {
+export const sendEmail = async ({ to, subject, title, message }: EmailParams) => {
     const response = await resend.emails.send({
         from: "Grilla Smash <noreply@grillasmash.com>",
         to,

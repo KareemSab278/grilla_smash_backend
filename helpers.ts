@@ -1,4 +1,8 @@
 import crypto from "crypto";
+import { sendEmail } from "./requestHandlers/email";
+import { QUERIES } from "./queries";
+import { OrderStatus } from "./types";
+import sql from "./db";
 
 
 export const normalizeAmount = (amount: string | number | undefined) => {
@@ -58,3 +62,70 @@ export const keysMatch = (rawKey: string, storedHash: string): boolean => {
     if (hashed.length !== stored.length) return false;
     return crypto.timingSafeEqual(hashed, stored);
 };
+
+// i will create a fn that has a hmap and generates the email for the customer to receive with required params. so if an order type == 'complete' then send the complete message and ttile email
+
+// this will happen on order updates and creations IF there is a customer email provided in the order. if not then no email will be sent.
+export const sendOrderStatusUpdateEmail = async (orderStatus: string, orderId: string) => {
+
+    const [customerEmailRow] = await sql.unsafe<{ customer_email: string }[]>(
+        QUERIES.GET.CUSTOMER_EMAIL_BY_ORDER_ID,
+        [orderId]
+    );
+
+    const customerEmail = customerEmailRow?.customer_email ?? null;
+
+    const updatableStatuses: OrderStatus[] = [
+        "preparing",
+        "ready",
+        "delivered",
+        "completed",
+        "refunded",
+        "cancelled"
+    ];
+
+    if (!customerEmail || !updatableStatuses.includes(orderStatus as OrderStatus)) {
+        console.error(`Cannot send email for order status: ${orderStatus} and customer email: ${customerEmail}`);
+        return;
+    }
+
+    const emailContent = EMAIL_CONTENT_HMAP[orderStatus];
+    if (!emailContent) {
+        console.error(`No email content found for order status: ${orderStatus}`);
+        return;
+    }
+
+    await sendEmail({
+        to: customerEmail,
+        subject: emailContent.subject,
+        title: emailContent.subject,
+        message: `Your order #${orderId} ${emailContent.body}`,
+    });
+};
+
+const EMAIL_CONTENT_HMAP: Record<string, { subject: string; body: string }> = {
+        preparing: {
+            subject: "Your order is being prepared",
+            body: `is now being prepared. We will notify you when it's ready for pickup or delivery.`
+        },
+        ready: {
+            subject: "Your order is ready",
+            body: `is now ready for pickup or delivery. Please check your order details for more information.`
+        },
+        delivered: {
+            subject: "Your order has been delivered",
+            body: `has been successfully delivered. We hope you enjoy your meal!`
+        },
+        completed: {
+            subject: "Your order is complete",
+            body: `has been completed. Thank you for choosing us!`
+        },
+        refunded: {
+            subject: "Your order has been refunded",
+            body: `has been refunded. Please check your account for the refund details.`
+        },
+        cancelled: {
+            subject: "Your order has been cancelled",
+            body: `has been cancelled. You will receive a refund within the next 12 - 24 hours. If you have any questions, please give our store a call.`
+        }
+    };

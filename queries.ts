@@ -180,6 +180,8 @@ ORDER BY id;
 `;
 
 
+const getCustEmailByOrderIdQuery = `SELECT customer_email FROM orders WHERE id = $1;`;
+
 export const QUERIES = {
     GET: {
         PRODUCTS: getProductsQuery,
@@ -188,6 +190,7 @@ export const QUERIES = {
         MEAL_SIDES: getMealSidesQuery,
         MEAL_DRINKS: getMealDrinksQuery,
         BRANCH_INFO: getStoreInfoQuery,
+        CUSTOMER_EMAIL_BY_ORDER_ID: getCustEmailByOrderIdQuery,
         "ALL-BRANCHES": `SELECT * FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,

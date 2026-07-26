@@ -11,6 +11,7 @@ import {
 	UpdateOrderStatusRequest,
 	UpdateOrderStatusResponse,
 } from "../types";
+import { sendOrderStatusUpdateEmail } from "../helpers";
 
 const router = express.Router();
 
@@ -178,7 +179,6 @@ router.patch("/orders/status", async (req, res) => {
 			return res.status(401).json({ error: "Unauthorized" });
 		}
 
-
 		const updated = await sql.unsafe<UpdateOrderStatusResponse[]>(
 			QUERIES.PATCH.ORDER_STATUS,
 			[id, status]
@@ -189,6 +189,8 @@ router.patch("/orders/status", async (req, res) => {
 				error: "order not found",
 			});
 		}
+
+		sendOrderStatusUpdateEmail(status, id);
 
 		return res.json(updated[0]);
 	} catch (err) {
