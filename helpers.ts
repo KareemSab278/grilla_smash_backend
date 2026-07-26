@@ -66,7 +66,7 @@ export const keysMatch = (rawKey: string, storedHash: string): boolean => {
 // i will create a fn that has a hmap and generates the email for the customer to receive with required params. so if an order type == 'complete' then send the complete message and ttile email
 
 // this will happen on order updates and creations IF there is a customer email provided in the order. if not then no email will be sent.
-export const sendOrderStatusUpdateEmail = async (orderStatus: string, orderId: string) => {
+export const sendOrderStatusUpdateEmail = async (orderStatus: OrderStatus, orderId: string) => {
 
     const [customerEmailRow] = await sql.unsafe<{ customer_email: string }[]>(
         QUERIES.GET.CUSTOMER_EMAIL_BY_ORDER_ID,
@@ -90,7 +90,7 @@ export const sendOrderStatusUpdateEmail = async (orderStatus: string, orderId: s
         return;
     }
 
-    if (!updatableStatuses.includes(orderStatus as OrderStatus)) {
+    if (!updatableStatuses.includes(orderStatus)) {
         console.error(`Invalid order status: ${orderStatus}. Cannot send email.`);
         return;
     }

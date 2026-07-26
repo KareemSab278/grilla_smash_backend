@@ -144,7 +144,7 @@ router.post("/orders", async (req, res) => {
 		}
 
 		await sendOrderStatusUpdateEmail("received", orderId);
-		
+		console.log(`Order created successfully with ID: ${orderId}`);
 		return res.status(201).json({
 			order_id: orderId,
 			message: "Order created successfully"
