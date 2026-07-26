@@ -40,7 +40,6 @@ router.get("/orders/:branchId", async (req, res) => {
 });
 
 router.post("/orders", async (req, res) => {
-	console.log("Received request to create order:", req.body);
 	try {
 		const body = req.body as CreateOrderRequest | KdsOrderPayload;
 
@@ -100,6 +99,7 @@ router.post("/orders", async (req, res) => {
 		);
 
 		const orderId = createdOrder[0]?.id;
+		
 		if (!orderId) {
 			return res.status(500).json({ error: "Failed to create order" });
 		}
@@ -143,6 +143,8 @@ router.post("/orders", async (req, res) => {
 			await sql`INSERT INTO order_item_meals ${sql(orderItemMeals)}`;
 		}
 
+		await sendOrderStatusUpdateEmail("received", orderId);
+		
 		return res.status(201).json({
 			order_id: orderId,
 			message: "Order created successfully"

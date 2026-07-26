@@ -76,6 +76,7 @@ export const sendOrderStatusUpdateEmail = async (orderStatus: string, orderId: s
     const customerEmail = customerEmailRow?.customer_email ?? null;
 
     const updatableStatuses: OrderStatus[] = [
+        "received",
         "preparing",
         "ready",
         "delivered",
@@ -84,10 +85,17 @@ export const sendOrderStatusUpdateEmail = async (orderStatus: string, orderId: s
         "cancelled"
     ];
 
-    if (!customerEmail || !updatableStatuses.includes(orderStatus as OrderStatus)) {
-        console.error(`Cannot send email for order status: ${orderStatus} and customer email: ${customerEmail}`);
+    if (!customerEmail || customerEmail.trim() === "" || !customerEmail.includes("@") || customerEmail.length < 7) {
+        console.error(`Cannot send email to: ${customerEmail}`);
         return;
     }
+
+    if (!updatableStatuses.includes(orderStatus as OrderStatus)) {
+        console.error(`Invalid order status: ${orderStatus}. Cannot send email.`);
+        return;
+    }
+
+    console.log(`Sending email for order status: ${orderStatus} to customer email: ${customerEmail}`);
 
     const emailContent = EMAIL_CONTENT_HMAP[orderStatus];
     if (!emailContent) {
@@ -104,6 +112,10 @@ export const sendOrderStatusUpdateEmail = async (orderStatus: string, orderId: s
 };
 
 const EMAIL_CONTENT_HMAP: Record<string, { subject: string; body: string }> = {
+        received: {
+            subject: "Your order has been received",
+            body: `has been received and is now being processed. We will notify you when it's ready for pickup or delivery. Thank you!`
+        },
         preparing: {
             subject: "Your order is being prepared",
             body: `is now being prepared. We will notify you when it's ready for pickup or delivery.`
