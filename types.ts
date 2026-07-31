@@ -54,6 +54,7 @@ export type OrderItemRequest = {
     price: number;
     extras?: { id: number; price: number }[];
     sauce_choice?: string;
+    notes?: string;
     meal?: MealSelection | null;
 };
 
@@ -89,7 +90,13 @@ export type OrderItem = {
     quantity: number;
     price: number;
     sauce_choice: string | null;
-    meal: { drink_id: number; drink_name: string; side_id: number; side_name: string } | null;
+    notes: string | null;
+    meal: {
+        drink_id: number;
+        drink_name: string;
+        side_id: number;
+        side_name: string;
+    } | null;
     options: OrderItemOption[] | null;
 };
 
@@ -167,6 +174,7 @@ export type CartItem = {
     extras?: Extra[];
     meal?: MealSelection | null;
     sauceChoice?: string;
+    notes?: string;
 };
 
 export type orderData = {

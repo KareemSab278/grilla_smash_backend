@@ -3,12 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendEmail = void 0;
 const resend_1 = require("resend");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
+// maybe this shouldnt be a route and just let the backend handle it all. 
 router.post("/email/send", async (req, res) => {
     const { to, subject, title, message } = req.body;
     if (!to || !subject || !title || !message) {
@@ -17,7 +19,7 @@ router.post("/email/send", async (req, res) => {
         });
     }
     try {
-        await sendEmail({ to, subject, title, message });
+        await (0, exports.sendEmail)({ to, subject, title, message });
         res.status(200).json({ message: "Email sent successfully" });
     }
     catch (error) {
@@ -34,6 +36,7 @@ const sendEmail = async ({ to, subject, title, message }) => {
     console.log("Email sent:", response);
     return response;
 };
+exports.sendEmail = sendEmail;
 const buildEmailContent = ({ title, message }) => `
 <!DOCTYPE html>
 <html lang="en">

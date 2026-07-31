@@ -99,7 +99,7 @@ router.post("/orders", async (req, res) => {
 		);
 
 		const orderId = createdOrder[0]?.id;
-		
+
 		if (!orderId) {
 			return res.status(500).json({ error: "Failed to create order" });
 		}
@@ -111,6 +111,7 @@ router.post("/orders", async (req, res) => {
 			quantity: item.quantity,
 			price: item.price,
 			sauce_choice: item.sauce_choice ?? null,
+			notes: item.notes ?? null
 		})))}
 			RETURNING id
 		`;
@@ -227,8 +228,12 @@ const mapKdsPayloadToCreateOrder = (payload: KdsOrderPayload): CreateOrderReques
 			product_id: Number(item.product?.id ?? item.id),
 			quantity: Number(item.quantity ?? 1),
 			price: Number(item.product?.price ?? 0),
-			extras: item.extras?.filter(e => e.id != null).map(e => ({ id: e.id!, price: e.price ?? 0 })),
+			extras: item.extras?.filter(e => e.id != null).map(e => ({
+				id: e.id!,
+				price: e.price ?? 0
+			})),
 			sauce_choice: item.sauceChoice ?? undefined,
+			notes: item.notes ?? undefined,
 			meal: item.meal ?? null,
 		})),
 	};

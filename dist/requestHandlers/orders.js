@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const db_1 = __importDefault(require("../db"));
 const queries_1 = require("../queries");
 const helpers_1 = require("../helpers");
+const helpers_2 = require("../helpers");
 const router = express_1.default.Router();
 router.get("/orders/:branchId", async (req, res) => {
     const { branchId } = req.params;
@@ -31,7 +32,6 @@ router.get("/orders/:branchId", async (req, res) => {
     }
 });
 router.post("/orders", async (req, res) => {
-    console.log("Received request to create order:", req.body);
     try {
         const body = req.body;
         const isKdsPayload = body && typeof body === "object" && "orderData" in body;
@@ -76,6 +76,7 @@ router.post("/orders", async (req, res) => {
             quantity: item.quantity,
             price: item.price,
             sauce_choice: item.sauce_choice ?? null,
+            notes: item.notes ?? null
         })))}
 			RETURNING id
 		`;
@@ -102,6 +103,8 @@ router.post("/orders", async (req, res) => {
         if (orderItemMeals.length > 0) {
             await (0, db_1.default) `INSERT INTO order_item_meals ${(0, db_1.default)(orderItemMeals)}`;
         }
+        await (0, helpers_2.sendOrderStatusUpdateEmail)("received", orderId);
+        console.log(`Order created successfully with ID: ${orderId}`);
         return res.status(201).json({
             order_id: orderId,
             message: "Order created successfully"
@@ -138,6 +141,7 @@ router.patch("/orders/status", async (req, res) => {
                 error: "order not found",
             });
         }
+        (0, helpers_2.sendOrderStatusUpdateEmail)(status, id);
         return res.json(updated[0]);
     }
     catch (err) {
@@ -169,8 +173,12 @@ const mapKdsPayloadToCreateOrder = (payload) => {
             product_id: Number(item.product?.id ?? item.id),
             quantity: Number(item.quantity ?? 1),
             price: Number(item.product?.price ?? 0),
-            extras: item.extras?.filter(e => e.id != null).map(e => ({ id: e.id, price: e.price ?? 0 })),
+            extras: item.extras?.filter(e => e.id != null).map(e => ({
+                id: e.id,
+                price: e.price ?? 0
+            })),
             sauce_choice: item.sauceChoice ?? undefined,
+            notes: item.notes ?? undefined,
             meal: item.meal ?? null,
         })),
     };

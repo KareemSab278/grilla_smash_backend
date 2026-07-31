@@ -108,6 +108,7 @@ o.id,
                 'quantity', oi.quantity,
                 'price', oi.price:: float,
                 'sauce_choice', oi.sauce_choice,
+                'notes', oi.notes,
                 'meal', (
                 SELECT json_build_object(
                     'drink_id', oim.drink_id,
@@ -166,6 +167,7 @@ id,
 FROM meal_drink_options
 ORDER BY id;
 `;
+const getCustEmailByOrderIdQuery = `SELECT customer_email FROM orders WHERE id = $1;`;
 exports.QUERIES = {
     GET: {
         PRODUCTS: getProductsQuery,
@@ -174,6 +176,7 @@ exports.QUERIES = {
         MEAL_SIDES: getMealSidesQuery,
         MEAL_DRINKS: getMealDrinksQuery,
         BRANCH_INFO: getStoreInfoQuery,
+        CUSTOMER_EMAIL_BY_ORDER_ID: getCustEmailByOrderIdQuery,
         "ALL-BRANCHES": `SELECT * FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,

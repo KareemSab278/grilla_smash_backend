@@ -118,6 +118,7 @@ o.id,
                 'quantity', oi.quantity,
                 'price', oi.price:: float,
                 'sauce_choice', oi.sauce_choice,
+                'notes', oi.notes,
                 'meal', (
                 SELECT json_build_object(
                     'drink_id', oim.drink_id,
