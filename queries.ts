@@ -79,8 +79,17 @@ RETURNING
     order_status;
 `;
 
+const updateBranchStatusQuery: string = `
+UPDATE branches
+SET active = $2
+WHERE id = $1
+RETURNING
+    id,
+    active;
+`;
+
 const getStoreInfoQuery: string = `
-SELECT id, name, location, latitude, longitude, created_at
+SELECT id, name, location, latitude, longitude, created_at, active
 FROM branches
 WHERE LOWER(name) = LOWER($1);
 `;
@@ -204,5 +213,6 @@ export const QUERIES = {
 
     PATCH: {
         ORDER_STATUS: updateOrderStatusQuery,
+        BRANCH_STATUS: updateBranchStatusQuery,
     }
 };
