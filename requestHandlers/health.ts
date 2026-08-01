@@ -2,6 +2,7 @@ import express from "express";
 import { QUERIES } from "../queries";
 import sql from "../db";
 import { Branch } from "../types";
+import { keysMatch } from "../helpers";
 
 const router = express.Router();
 
@@ -36,6 +37,21 @@ router.get("/all-branches", async (req, res) => {
 
 router.patch("/branch-status", async (req, res) => {
     const { branch_id, status } = req.body;
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    const rawKey = authHeader.slice(7);
+    const [branch] = await sql.unsafe<{ branch_key: string }[]>(
+        QUERIES.GET.BRANCH_KEY, [branch_id]
+    );
+
+    if (!branch?.branch_key || !keysMatch(rawKey, branch.branch_key)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
 
     if (!branch_id || (status !== true && status !== false)) { // check if status is strictly true or false
         return res.status(400).json({
