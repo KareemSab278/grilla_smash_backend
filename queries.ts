@@ -106,6 +106,7 @@ const getBranchKeyByOrderIdQuery = `
     WHERE o.id = $1;
 `;
 
+// gets in the last day
 const getOrdersByBranchIdQuery: string = `
 SELECT
 o.id,
@@ -164,8 +165,73 @@ JOIN order_items oi
 JOIN products p
     ON p.id = oi.product_id
 
-WHERE o.branch_id = $1
+WHERE o.branch_id = $1 and o.created_at >= NOW() - INTERVAL '1 day' -- today's orders only
 AND o.order_status != 'delivered' and o.order_status != 'refunded' and o.order_status != 'completed'
+GROUP BY o.id
+
+ORDER BY o.created_at DESC;
+`;
+
+// gets in the last 30 days
+const getHistoryOrdersByBranchIdQuery: string = `
+SELECT
+o.id,
+       o.customer_name,
+    o.customer_phone,
+    o.order_status,
+    o.payment_id,
+    o.customer_city,
+    o.customer_postcode,
+    o.customer_address1,
+    o.customer_address2,
+    o.total:: float,
+        o.created_at,
+        o.is_pickup,
+        json_agg(
+            json_build_object(
+                'product_id', oi.product_id,
+                'product_name', p.name,
+                'quantity', oi.quantity,
+                'price', oi.price:: float,
+                'sauce_choice', oi.sauce_choice,
+                'notes', oi.notes,
+                'meal', (
+                SELECT json_build_object(
+                    'drink_id', oim.drink_id,
+                    'drink_name', mdo.name,
+                    'side_id', oim.side_id,
+                    'side_name', mso.name
+                )
+                FROM order_item_meals oim
+                LEFT JOIN meal_drink_options mdo ON mdo.id = oim.drink_id
+                LEFT JOIN meal_side_options mso ON mso.id = oim.side_id
+                WHERE oim.order_item_id = oi.id
+            ),
+                'options', (
+                SELECT json_agg(
+                    json_build_object(
+                        'option_id', oio.option_id,
+                        'name', op.name,
+                        'price', oio.price:: float
+                    )
+                )
+                FROM order_item_options oio
+                JOIN options op
+                    ON op.id = oio.option_id
+                WHERE oio.order_item_id = oi.id
+            )
+        )
+    ) AS items
+
+FROM orders o
+
+JOIN order_items oi
+    ON oi.order_id = o.id
+
+JOIN products p
+    ON p.id = oi.product_id
+
+WHERE o.branch_id = $1 and o.created_at >= NOW() - INTERVAL '30 day'
 GROUP BY o.id
 
 ORDER BY o.created_at DESC;
@@ -205,6 +271,7 @@ export const QUERIES = {
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,
         BRANCH_KEY_BY_ORDER: getBranchKeyByOrderIdQuery,
+        HISTORY_BY_BRANCH_ID: getHistoryOrdersByBranchIdQuery,
     },
 
     POST: {

@@ -39,6 +39,31 @@ router.get("/orders/:branchId", async (req, res) => {
 	}
 });
 
+
+router.get("/orders/history/:branchId", async (req, res) => {
+	const { branchId } = req.params;
+	const authHeader = req.headers.authorization;
+	if (!authHeader?.startsWith("Bearer ")) {
+		return res.status(401).json({ error: "Unauthorized" });
+	}
+	const rawKey = authHeader.slice(7);
+	const [branch] = await sql.unsafe<{ branch_key: string }[]>(
+		QUERIES.GET.BRANCH_KEY, [branchId]
+	);
+	if (!branch?.branch_key || !keysMatch(rawKey, branch.branch_key)) {
+		return res.status(401).json({ error: "Unauthorized" });
+	}
+	try {
+		const orders = await sql.unsafe<Order[]>(QUERIES.GET.HISTORY_BY_BRANCH_ID, [branchId]);
+		return res.json({ orders });
+	} catch (err) {
+		console.error(err);
+		return res.status(500).json({
+			error: (err as Error).message,
+		});
+	}
+});
+
 router.post("/orders", async (req, res) => {
 	try {
 		const body = req.body as CreateOrderRequest | KdsOrderPayload;
