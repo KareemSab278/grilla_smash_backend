@@ -185,7 +185,7 @@ exports.QUERIES = {
         MEAL_DRINKS: getMealDrinksQuery,
         BRANCH_INFO: getStoreInfoQuery,
         CUSTOMER_EMAIL_BY_ORDER_ID: getCustEmailByOrderIdQuery,
-        "ALL-BRANCHES": `SELECT * FROM branches; `,
+        "ALL-BRANCHES": `SELECT id, name, location, latitude, longitude, active FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,
         BRANCH_KEY_BY_ORDER: getBranchKeyByOrderIdQuery,

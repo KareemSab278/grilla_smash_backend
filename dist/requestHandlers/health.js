@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const queries_1 = require("../queries");
 const db_1 = __importDefault(require("../db"));
+const helpers_1 = require("../helpers");
 const router = express_1.default.Router();
 router.get("/health", async (req, res) => {
     res.json({
@@ -33,6 +34,15 @@ router.get("/all-branches", async (req, res) => {
 });
 router.patch("/branch-status", async (req, res) => {
     const { branch_id, status } = req.body;
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    const rawKey = authHeader.slice(7);
+    const [branch] = await db_1.default.unsafe(queries_1.QUERIES.GET.BRANCH_KEY, [branch_id]);
+    if (!branch?.branch_key || !(0, helpers_1.keysMatch)(rawKey, branch.branch_key)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
     if (!branch_id || (status !== true && status !== false)) { // check if status is strictly true or false
         return res.status(400).json({
             success: false,
