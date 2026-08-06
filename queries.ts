@@ -88,6 +88,38 @@ RETURNING
     active;
 `;
 
+const purgeOldCustomerDataQuery: string = `
+WITH candidate_orders AS (
+  SELECT id
+  FROM orders
+  WHERE created_at < NOW() - INTERVAL '72 hours'
+    AND created_at >= NOW() - INTERVAL '96 hours'
+    AND order_status NOT IN ('cancelled') -- if needs to be refunded do not purge it.
+    AND (
+      customer_name IS NOT NULL OR
+      customer_phone IS NOT NULL OR
+      customer_email IS NOT NULL OR
+      customer_address1 IS NOT NULL OR
+      customer_address2 IS NOT NULL OR
+      customer_city IS NOT NULL OR
+      customer_postcode IS NOT NULL
+    )
+  LIMIT 1000
+)
+UPDATE orders
+SET
+    customer_name = NULL,
+    customer_phone = NULL,
+    customer_email = NULL,
+    customer_address1 = NULL,
+    customer_address2 = NULL,
+    customer_city = NULL,
+    customer_postcode = NULL
+FROM candidate_orders
+WHERE orders.id = candidate_orders.id
+RETURNING orders.id;
+`;
+
 const getStoreInfoQuery: string = `
 SELECT id, name, location, latitude, longitude, created_at, active
 FROM branches
@@ -281,5 +313,6 @@ export const QUERIES = {
     PATCH: {
         ORDER_STATUS: updateOrderStatusQuery,
         BRANCH_STATUS: updateBranchStatusQuery,
+        PURGE_OLD_CUSTOMER_DATA: purgeOldCustomerDataQuery,
     }
 };

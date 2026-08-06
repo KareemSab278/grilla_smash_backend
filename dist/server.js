@@ -12,6 +12,7 @@ const health_1 = __importDefault(require("./requestHandlers/health"));
 const orders_1 = __importDefault(require("./requestHandlers/orders"));
 const route_1 = __importDefault(require("./requestHandlers/route"));
 const email_1 = __importDefault(require("./requestHandlers/email"));
+const purge_1 = __importDefault(require("./purge"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -22,6 +23,9 @@ app.use("/api", menu_1.default);
 app.use("/api", orders_1.default);
 app.use("/api", route_1.default);
 app.use("/api", email_1.default);
+void (0, purge_1.default)().catch((error) => {
+    console.error("Customer data purge loop startup failed:", error);
+});
 app.listen(6969, () => {
     console.log("Server running on port 6969");
 });

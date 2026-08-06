@@ -53,7 +53,6 @@ export const buildCheckoutRequest = ({ amount, currency = "GBP" }: {
     return { charge };
 };
 
-
 export const keysMatch = (rawKey: string, storedHash: string): boolean => {
     const hashed = Buffer.from(
         crypto.createHash("sha256").update(rawKey).digest("hex")

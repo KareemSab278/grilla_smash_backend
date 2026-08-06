@@ -8,6 +8,7 @@ import health from "./requestHandlers/health";
 import orders from "./requestHandlers/orders";
 import route from "./requestHandlers/route";
 import email from "./requestHandlers/email";
+import startCustomerDataPurgeLoop from "./purge";
 
 const app = express();
 
@@ -22,6 +23,9 @@ app.use("/api", orders);
 app.use("/api", route);
 app.use("/api", email);
 
+void startCustomerDataPurgeLoop().catch((error) => {
+    console.error("Customer data purge loop startup failed:", error);
+});
 
 app.listen(6969, () => {
     console.log("Server running on port 6969");
