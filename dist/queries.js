@@ -9,7 +9,8 @@ SELECT
     p.price::float,
     p.description,
     p.image,
-    p.popular
+    p.popular,
+    p.ingredients
 FROM products p
 JOIN categories c
     ON c.id = p.category_id
@@ -46,7 +47,8 @@ INSERT INTO orders (
     delivery_fee,
     total,
     order_status,
-    payment_id
+    payment_id,
+    order_notes
 )
 VALUES (
     $1,
@@ -61,7 +63,8 @@ VALUES (
     $10,
     $11,
     $12,
-    $13
+    $13,
+    $14
 )
 RETURNING id;
 `;
@@ -96,6 +99,7 @@ WITH candidate_orders AS (
       customer_address2 IS NOT NULL OR
       customer_city IS NOT NULL OR
       customer_postcode IS NOT NULL
+      OR order_notes IS NOT NULL
     )
   LIMIT 1000
 )
@@ -107,7 +111,8 @@ SET
     customer_address1 = NULL,
     customer_address2 = NULL,
     customer_city = NULL,
-    customer_postcode = NULL
+    customer_postcode = NULL,
+    order_notes = NULL
 FROM candidate_orders
 WHERE orders.id = candidate_orders.id
 RETURNING orders.id;
@@ -138,6 +143,7 @@ o.id,
     o.customer_postcode,
     o.customer_address1,
     o.customer_address2,
+    o.order_notes,
     o.total:: float,
         o.created_at,
         o.is_pickup,
@@ -203,6 +209,7 @@ o.id,
     o.customer_postcode,
     o.customer_address1,
     o.customer_address2,
+    o.order_notes,
     o.total:: float,
         o.created_at,
         o.is_pickup,

@@ -18,17 +18,15 @@ router.get("/menu", async (req, res) => {
             products,
             mealSideOptions: sides,
             drinkOptions: drinks,
-            extrasByCategory: {
-                burgers: options.filter(x => x.category === "burgers"),
-                wraps: options.filter(x => x.category === "wraps"),
-                chicken: [
-                    {
-                        name: "Sauce",
-                        price: 0
-                    }
-                ],
-                "loaded-fries": options.filter(x => x.category === "loaded-fries")
-            },
+            extrasByCategory: options.reduce((acc, option) => {
+                const cat = option.category;
+                if (!cat)
+                    return acc;
+                if (!acc[cat])
+                    acc[cat] = [];
+                acc[cat].push(option);
+                return acc;
+            }, {}),
             mealOptions: meals.map(meal => ({
                 name: meal.name,
                 price: meal.price

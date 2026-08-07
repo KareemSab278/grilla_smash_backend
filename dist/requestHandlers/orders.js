@@ -60,7 +60,7 @@ router.post("/orders", async (req, res) => {
         const normalizedOrder = isKdsPayload
             ? mapKdsPayloadToCreateOrder(body)
             : body;
-        const { branch_id, customer_name, customer_phone, customer_email, customer_address1, customer_address2, customer_city, customer_postcode, is_pickup, delivery_fee, total, order_status, items, payment_id: paymentId // REQUIRED: Ensure payment_id is included in the normalized order.
+        const { branch_id, customer_name, customer_phone, customer_email, customer_address1, customer_address2, customer_city, customer_postcode, is_pickup, delivery_fee, total, order_status, order_notes, items, payment_id: paymentId // REQUIRED: Ensure payment_id is included in the normalized order.
          } = normalizedOrder;
         if (!branch_id || !customer_name || !Number.isFinite(total)) {
             return res.status(400).json({
@@ -85,7 +85,8 @@ router.post("/orders", async (req, res) => {
             delivery_fee ?? null,
             total,
             order_status ?? "pending",
-            paymentId
+            paymentId,
+            order_notes ?? null
         ]);
         const orderId = createdOrder[0]?.id;
         if (!orderId) {
