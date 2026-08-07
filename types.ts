@@ -31,15 +31,7 @@ export type MenuResponse = {
         price: number;
     }[];
 
-    extrasByCategory: {
-        burgers: MenuOption[];
-        wraps: MenuOption[];
-        chicken: {
-            name: string;
-            price: number;
-        }[];
-        "loaded-fries": MenuOption[];
-    };
+    extrasByCategory: Record<string, MenuOption[]>;
 
     mealOptions: {
         name: string;
