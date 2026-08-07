@@ -88,6 +88,7 @@ router.post("/orders", async (req, res) => {
 			delivery_fee,
 			total,
 			order_status,
+			order_notes,
 			items,
 			payment_id: paymentId // REQUIRED: Ensure payment_id is included in the normalized order.
 		} = normalizedOrder;
@@ -119,7 +120,8 @@ router.post("/orders", async (req, res) => {
 				delivery_fee ?? null,
 				total,
 				order_status ?? "pending",
-				paymentId
+				paymentId,
+				order_notes ?? null
 			]
 		);
 
@@ -131,13 +133,13 @@ router.post("/orders", async (req, res) => {
 
 		const insertedItems = await sql<{ id: string }[]>`
 			INSERT INTO order_items ${sql(items.map(item => ({
-			order_id: orderId,
-			product_id: item.product_id,
-			quantity: item.quantity,
-			price: item.price,
-			sauce_choice: item.sauce_choice ?? null,
-			notes: item.notes ?? null
-		})))}
+				order_id: orderId,
+				product_id: item.product_id,
+				quantity: item.quantity,
+				price: item.price,
+				sauce_choice: item.sauce_choice ?? null,
+				notes: item.notes ?? null
+			})))}
 			RETURNING id
 		`;
 

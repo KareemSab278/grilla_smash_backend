@@ -64,6 +64,7 @@ export type CreateOrderRequest = {
     delivery_fee?: number;
     total: number;
     order_status?: OrderStatus;
+    order_notes?: string;
     items: OrderItemRequest[];
     payment_id: string;
 };
@@ -103,6 +104,7 @@ export type Order = {
     customer_name: string;
     customer_phone?: string;
     order_status: OrderStatus;
+    order_notes?: string | null;
     total: number;
     created_at: string;
     items: OrderItem[];
