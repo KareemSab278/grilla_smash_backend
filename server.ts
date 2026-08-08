@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { rateLimiterMiddleware } from "./rateLimiter";
 
 import payments from "./requestHandlers/payments";
 import menu from "./requestHandlers/menu";
@@ -15,6 +16,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(rateLimiterMiddleware);
 
 app.use("/api", health);
 app.use("/api", payments);
