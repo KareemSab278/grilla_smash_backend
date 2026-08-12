@@ -121,7 +121,7 @@ router.post("/orders", async (req, res) => {
 				total,
 				order_status ?? "pending",
 				paymentId,
-				order_notes ?? null
+				order_notes ?? ""
 			]
 		);
 
