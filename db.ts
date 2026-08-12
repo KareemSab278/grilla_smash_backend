@@ -8,6 +8,7 @@ if (!connectionString) {
     console.log("DATABASE_URL found");
 }
 
+
 const sql = postgres(connectionString);
 
 export default sql;
