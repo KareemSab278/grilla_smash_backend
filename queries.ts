@@ -197,10 +197,10 @@ o.id,
 
 FROM orders o
 
-JOIN order_items oi
+LEFT JOIN order_items oi
     ON oi.order_id = o.id
 
-JOIN products p
+LEFT JOIN products p
     ON p.id = oi.product_id
 
 WHERE o.branch_id = $1 and o.created_at >= NOW() - INTERVAL '1 day' -- today's orders only
