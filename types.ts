@@ -6,6 +6,7 @@ export type MenuProduct = {
     description: string;
     image: string;
     popular: boolean;
+    in_deal: boolean;
 };
 
 

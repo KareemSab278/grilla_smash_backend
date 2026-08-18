@@ -7,7 +7,8 @@ SELECT
     p.description,
     p.image,
     p.popular,
-    p.ingredients
+    p.ingredients,
+    p.in_deal
 FROM products p
 JOIN categories c
     ON c.id = p.category_id
