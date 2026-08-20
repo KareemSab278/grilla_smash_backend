@@ -18,7 +18,7 @@ const purgeStaleCustomerData = async () => {
     try {
         const updatedRows = await db_1.default.unsafe(queries_1.QUERIES.PATCH.PURGE_OLD_CUSTOMER_DATA);
         lastCustomerDataPurgeAt = now;
-        const count = updatedRows.length;
+        const count = updatedRows[0]?.updated_count || 0;
         console.log(`Customer data purge completed. Updated ${count} order(s).`);
         return count;
     }

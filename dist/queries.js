@@ -10,7 +10,8 @@ SELECT
     p.description,
     p.image,
     p.popular,
-    p.ingredients
+    p.ingredients,
+    p.in_deal
 FROM products p
 JOIN categories c
     ON c.id = p.category_id
@@ -86,36 +87,40 @@ RETURNING
 `;
 const purgeOldCustomerDataQuery = `
 WITH candidate_orders AS (
-  SELECT id
-  FROM orders
-  WHERE created_at < NOW() - INTERVAL '72 hours'
-    AND created_at >= NOW() - INTERVAL '96 hours'
-    AND order_status NOT IN ('cancelled') -- if needs to be refunded do not purge it.
-    AND (
-      customer_name IS NOT NULL OR
-      customer_phone IS NOT NULL OR
-      customer_email IS NOT NULL OR
-      customer_address1 IS NOT NULL OR
-      customer_address2 IS NOT NULL OR
-      customer_city IS NOT NULL OR
-      customer_postcode IS NOT NULL
-      OR order_notes IS NOT NULL
-    )
-  LIMIT 1000
+    SELECT id
+    FROM orders
+    WHERE created_at < NOW() - INTERVAL '72 hours'
+      AND created_at >= NOW() - INTERVAL '96 hours'
+      AND order_status NOT IN ('cancelled')
+      AND (
+          customer_name IS NOT NULL OR
+          customer_phone IS NOT NULL OR
+          customer_email IS NOT NULL OR
+          customer_address1 IS NOT NULL OR
+          customer_address2 IS NOT NULL OR
+          customer_city IS NOT NULL OR
+          customer_postcode IS NOT NULL OR
+          order_notes IS NOT NULL
+      )
+    LIMIT 1000
+),
+updated_orders AS (
+    UPDATE orders
+    SET
+        customer_name = '-',
+        customer_phone = 0,
+        customer_email = '-',
+        customer_address1 = '-',
+        customer_address2 = '-',
+        customer_city = '-',
+        customer_postcode = '-',
+        order_notes = '-'
+    FROM candidate_orders
+    WHERE orders.id = candidate_orders.id
+    RETURNING orders.id
 )
-UPDATE orders
-SET
-    customer_name = NULL,
-    customer_phone = NULL,
-    customer_email = NULL,
-    customer_address1 = NULL,
-    customer_address2 = NULL,
-    customer_city = NULL,
-    customer_postcode = NULL,
-    order_notes = NULL
-FROM candidate_orders
-WHERE orders.id = candidate_orders.id
-RETURNING orders.id;
+SELECT count(*) AS updated_count
+FROM updated_orders;
 `;
 const getStoreInfoQuery = `
 SELECT id, name, location, latitude, longitude, created_at, active
@@ -185,10 +190,10 @@ o.id,
 
 FROM orders o
 
-JOIN order_items oi
+LEFT JOIN order_items oi
     ON oi.order_id = o.id
 
-JOIN products p
+LEFT JOIN products p
     ON p.id = oi.product_id
 
 WHERE o.branch_id = $1 and o.created_at >= NOW() - INTERVAL '1 day' -- today's orders only

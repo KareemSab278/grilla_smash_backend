@@ -2,12 +2,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.rateLimiterMiddleware = void 0;
 const rate_limiter_flexible_1 = require("rate-limiter-flexible");
-const MAX_IP_REQUESTS = 20;
+/*
+    MAX 30 REQUESTS PER SECOND PER ALL IPS CURRENTLY MAKING REQUESTS TO THE SERVER
+    IF OVER 30 REQS PER SECOND THEN BLOCK EVERYTHING FOR 1 MINUTE - SEND 429 TO EVERYONE
+*/
+const MAX_GLOBAL_REQUESTS = 30;
 const REQUESTS_DURATION_SECONDS = 1;
-const BLOCK_DURATION_SECONDS = 120;
+const BLOCK_DURATION_SECONDS = 60;
 const MAX_REQS_PER_MINUTE = 100;
 const rateLimiter = new rate_limiter_flexible_1.RateLimiterMemory({
-    points: MAX_IP_REQUESTS,
+    points: MAX_GLOBAL_REQUESTS,
     duration: REQUESTS_DURATION_SECONDS,
     blockDuration: BLOCK_DURATION_SECONDS,
 });
@@ -17,7 +21,7 @@ const globalRateLimiter = new rate_limiter_flexible_1.RateLimiterMemory({
     blockDuration: BLOCK_DURATION_SECONDS,
 });
 const rateLimiterMiddleware = async (req, res, next) => {
-    const key = req.ip || "global";
+    const key = "REQUEST";
     try {
         await globalRateLimiter.consume(key);
         await rateLimiter.consume(key);
