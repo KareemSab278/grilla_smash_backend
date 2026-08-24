@@ -1,3 +1,52 @@
+/*
+    INSERT INTO meal_side_options (name, price)
+    VALUES
+        ('3 Mild Peri Wings', '1.99'),
+        ('3 Wild Peri Wings', '1.99'),
+        ('3 Lemon & Herb Peri Wings', '1.99'),
+        ('3 Honey Sriracha Peri Wings', '1.99'),
+        ('2 Mild Peri Strips', '2.49'),
+        ('2 Wild Peri Strips', '2.49'),
+        ('2 Lemon & Herb Peri Strips', '2.49'),
+        ('2 Honey Sriracha Peri Strips', '2.49');
+*/
+
+
+const getBestSellersQuery: string = `
+SELECT
+    p.id AS product_id,
+    p.name AS product_name,
+    SUM(oi.quantity) AS units_sold,
+    COUNT(DISTINCT o.id) AS orders_count,
+    ROUND(SUM(oi.quantity * oi.price::float)::numeric, 2) AS sales_value
+FROM orders o
+JOIN order_items oi
+    ON oi.order_id = o.id
+JOIN products p
+    ON p.id = oi.product_id
+WHERE o.order_status IN ('delivered', 'completed')
+GROUP BY p.id, p.name
+ORDER BY units_sold DESC
+LIMIT 6;
+`;
+
+const getMostRevenueQuery: string = `
+SELECT
+    p.id AS product_id,
+    p.name AS product_name,
+    SUM(oi.quantity) AS units_sold,
+    ROUND(SUM(oi.quantity * oi.price::float)::numeric, 2) AS sales_value
+FROM orders o
+JOIN order_items oi
+    ON oi.order_id = o.id
+JOIN products p
+    ON p.id = oi.product_id
+WHERE o.order_status IN ('delivered', 'completed')
+GROUP BY p.id, p.name
+ORDER BY sales_value DESC
+LIMIT 6;
+`;
+
 const getProductsQuery: string = `
 SELECT
     p.id,
