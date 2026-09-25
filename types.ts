@@ -133,6 +133,7 @@ export type Branch = {
     location: string;
     latitude: number;
     longitude: number;
+    unavailable_products: number[];
 };
 
 export type Extra = {

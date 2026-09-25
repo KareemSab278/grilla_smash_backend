@@ -1,6 +1,51 @@
 "use strict";
+/*
+    INSERT INTO meal_side_options (name, price)
+    VALUES
+        ('3 Mild Peri Wings', '1.99'),
+        ('3 Wild Peri Wings', '1.99'),
+        ('3 Lemon & Herb Peri Wings', '1.99'),
+        ('3 Honey Sriracha Peri Wings', '1.99'),
+        ('2 Mild Peri Strips', '2.49'),
+        ('2 Wild Peri Strips', '2.49'),
+        ('2 Lemon & Herb Peri Strips', '2.49'),
+        ('2 Honey Sriracha Peri Strips', '2.49');
+*/
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QUERIES = void 0;
+const getBestSellersQuery = `
+SELECT
+    p.id AS product_id,
+    p.name AS product_name,
+    SUM(oi.quantity) AS units_sold,
+    COUNT(DISTINCT o.id) AS orders_count,
+    ROUND(SUM(oi.quantity * oi.price::float)::numeric, 2) AS sales_value
+FROM orders o
+JOIN order_items oi
+    ON oi.order_id = o.id
+JOIN products p
+    ON p.id = oi.product_id
+WHERE o.order_status IN ('delivered', 'completed')
+GROUP BY p.id, p.name
+ORDER BY units_sold DESC
+LIMIT 6;
+`;
+const getMostRevenueQuery = `
+SELECT
+    p.id AS product_id,
+    p.name AS product_name,
+    SUM(oi.quantity) AS units_sold,
+    ROUND(SUM(oi.quantity * oi.price::float)::numeric, 2) AS sales_value
+FROM orders o
+JOIN order_items oi
+    ON oi.order_id = o.id
+JOIN products p
+    ON p.id = oi.product_id
+WHERE o.order_status IN ('delivered', 'completed')
+GROUP BY p.id, p.name
+ORDER BY sales_value DESC
+LIMIT 6;
+`;
 const getProductsQuery = `
 SELECT
     p.id,
@@ -85,6 +130,18 @@ RETURNING
     id,
     active;
 `;
+/*
+    this query appends/updates the brnaches table with new array of products unavailable for the specified branch by the branch ID.
+
+*/
+const updateUnavailableProductsQuery = `
+    UPDATE branches
+    SET unavailable_products = $2
+    WHERE id = $1
+    RETURNING
+        id,
+        unavailable_products;
+`;
 const purgeOldCustomerDataQuery = `
 WITH candidate_orders AS (
     SELECT id
@@ -123,7 +180,7 @@ SELECT count(*) AS updated_count
 FROM updated_orders;
 `;
 const getStoreInfoQuery = `
-SELECT id, name, location, latitude, longitude, created_at, active
+SELECT id, name, location, latitude, longitude, created_at, active, unavailable_products
 FROM branches
 WHERE LOWER(name) = LOWER($1);
 `;
@@ -293,7 +350,7 @@ exports.QUERIES = {
         MEAL_DRINKS: getMealDrinksQuery,
         BRANCH_INFO: getStoreInfoQuery,
         CUSTOMER_EMAIL_BY_ORDER_ID: getCustEmailByOrderIdQuery,
-        "ALL-BRANCHES": `SELECT id, name, location, latitude, longitude, active FROM branches; `,
+        "ALL-BRANCHES": `SELECT id, name, location, latitude, longitude, active, unavailable_products FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,
         BRANCH_KEY_BY_ORDER: getBranchKeyByOrderIdQuery,
@@ -306,5 +363,6 @@ exports.QUERIES = {
         ORDER_STATUS: updateOrderStatusQuery,
         BRANCH_STATUS: updateBranchStatusQuery,
         PURGE_OLD_CUSTOMER_DATA: purgeOldCustomerDataQuery,
+        UPDATE_UNAVAILABLE_PRODUCTS: updateUnavailableProductsQuery,
     }
 };

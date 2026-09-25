@@ -141,6 +141,20 @@ RETURNING
     active;
 `;
 
+/*
+    this query appends/updates the brnaches table with new array of products unavailable for the specified branch by the branch ID.
+
+*/
+
+const updateUnavailableProductsQuery: string = `
+    UPDATE branches
+    SET unavailable_products = $2
+    WHERE id = $1
+    RETURNING
+        id,
+        unavailable_products;
+`;
+
 const purgeOldCustomerDataQuery: string = `
 WITH candidate_orders AS (
     SELECT id
@@ -180,7 +194,7 @@ FROM updated_orders;
 `;
 
 const getStoreInfoQuery: string = `
-SELECT id, name, location, latitude, longitude, created_at, active
+SELECT id, name, location, latitude, longitude, created_at, active, unavailable_products
 FROM branches
 WHERE LOWER(name) = LOWER($1);
 `;
@@ -360,7 +374,7 @@ export const QUERIES = {
         MEAL_DRINKS: getMealDrinksQuery,
         BRANCH_INFO: getStoreInfoQuery,
         CUSTOMER_EMAIL_BY_ORDER_ID: getCustEmailByOrderIdQuery,
-        "ALL-BRANCHES": `SELECT id, name, location, latitude, longitude, active FROM branches; `,
+        "ALL-BRANCHES": `SELECT id, name, location, latitude, longitude, active, unavailable_products FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,
         BRANCH_KEY_BY_ORDER: getBranchKeyByOrderIdQuery,
@@ -375,5 +389,6 @@ export const QUERIES = {
         ORDER_STATUS: updateOrderStatusQuery,
         BRANCH_STATUS: updateBranchStatusQuery,
         PURGE_OLD_CUSTOMER_DATA: purgeOldCustomerDataQuery,
+        UPDATE_UNAVAILABLE_PRODUCTS: updateUnavailableProductsQuery,
     }
 };

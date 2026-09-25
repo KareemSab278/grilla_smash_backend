@@ -35,6 +35,53 @@ router.get("/all-branches", async (req, res) => {
     }
 });
 
+router.patch("/unavailable-products", async (req, res) => {
+    const { branch_id, unavailable_products } = req.body;
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    const rawKey = authHeader.slice(7);
+    const [branch] = await sql.unsafe<{ branch_key: string }[]>(
+        QUERIES.GET.BRANCH_KEY, [branch_id]
+    );
+
+    if (!branch?.branch_key || !keysMatch(rawKey, branch.branch_key)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    if (!branch_id || !Array.isArray(unavailable_products)) {
+        return res.status(400).json({
+            success: false,
+            error: "Missing required parameters",
+            error_message: "branch_id and unavailable_products are required and unavailable_products must be an array!"
+        });
+    }
+
+    try {
+        const [updatedBranch] = await sql.unsafe<{ id: string; unavailable_products: number[] }[]>(
+            QUERIES.PATCH.UPDATE_UNAVAILABLE_PRODUCTS, [branch_id, unavailable_products]
+        );
+
+        return res.json({
+            success: true,
+            message: `Unavailable products updated for branch ${branch_id}`,
+            branch: updatedBranch
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+            error_message: (err as Error).message
+        });
+    }
+});
+
+
 router.patch("/branch-status", async (req, res) => {
     const { branch_id, status } = req.body;
 
