@@ -35,6 +35,31 @@ router.get("/all-branches", async (req, res) => {
     }
 });
 
+
+router.get("/unavailable-products", async (req, res) => {
+    try {
+        const branch_id = req.query.branch_id as string;
+        const [branch] = await sql.unsafe<{ id: string; active: boolean; unavailable_products: number[] }[]>(
+            QUERIES.GET["UNAVAILABLE_PRODUCTS"], [branch_id]
+        );
+
+        return res.json({
+            success: true,
+            branch_id: branch?.id,
+            active: branch?.active,
+            unavailable_products: branch?.unavailable_products ?? []
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+            error_message: (err as Error).message
+        });
+    }
+});
+
 router.patch("/unavailable-products", async (req, res) => {
     const { branch_id, unavailable_products } = req.body;
 

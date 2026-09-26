@@ -155,6 +155,12 @@ const updateUnavailableProductsQuery: string = `
         unavailable_products;
 `;
 
+const getUnavailableProductsQuery: string = `
+SELECT id, active, unavailable_products
+FROM branches
+WHERE id = $1;
+`;
+
 const purgeOldCustomerDataQuery: string = `
 WITH candidate_orders AS (
     SELECT id
@@ -374,6 +380,7 @@ export const QUERIES = {
         MEAL_DRINKS: getMealDrinksQuery,
         BRANCH_INFO: getStoreInfoQuery,
         CUSTOMER_EMAIL_BY_ORDER_ID: getCustEmailByOrderIdQuery,
+        UNAVAILABLE_PRODUCTS: getUnavailableProductsQuery,
         "ALL-BRANCHES": `SELECT id, name, location, latitude, longitude, active, unavailable_products FROM branches; `,
         ORDERS_BY_BRANCH_ID: getOrdersByBranchIdQuery,
         BRANCH_KEY: getBranchKeyByBranchIdQuery,
