@@ -14,6 +14,7 @@ import productModifierGroups from "./requestHandlers/productModifierGroups";
 import modifierGroups from "./requestHandlers/modifierGroups";
 import modifiers from "./requestHandlers/modifiers";
 import offers from "./requestHandlers/offers";
+import orders from "./requestHandlers/orders";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -34,6 +35,7 @@ app.use(productModifierGroups);
 app.use(modifierGroups);
 app.use(modifiers);
 app.use(offers);
+app.use(orders);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

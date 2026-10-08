@@ -187,6 +187,59 @@ const offerRuleSchema = z.object({
     modifier_groups: z.array(offerRuleModifierGroupSchema).default([]),
 });
 
+const orderStatusSchema = z.enum([
+    "received",
+    "preparing",
+    "ready",
+    "delivered",
+    "completed",
+    "refunded",
+    "cancelled",
+]);
+
+// ========================================
+// ORDERS
+// ========================================
+
+const orderItemModifierSchema = z.object({
+    id,
+    name,
+    price: pence,
+    quantity: z.int().min(1).default(1),
+});
+
+const orderItemSchema = z.object({
+    product_id: id,
+    quantity: z.int().min(1),
+    price: pence,
+    sauce_choice: z.string().trim().min(1).nullish(),
+    notes: z.string().trim().max(2000).nullish(),
+    modifiers: z.array(orderItemModifierSchema).default([]),
+});
+
+export const createOrderSchema = z.object({
+    branch_id: id,
+    customer_name: name,
+    customer_phone: z.string().trim().min(1).nullish(),
+    customer_email: z.string().trim().email().nullish(),
+    customer_address1: z.string().trim().min(1).nullish(),
+    customer_address2: z.string().trim().min(1).nullish(),
+    customer_city: z.string().trim().min(1).nullish(),
+    customer_postcode: z.string().trim().min(1).nullish(),
+    is_pickup: z.boolean().default(false),
+    delivery_fee: pence.nullish(),
+    total: pence,
+    order_status: orderStatusSchema.default("received"),
+    order_notes: z.string().trim().max(4000).nullish(),
+    payment_id: z.string().trim().min(1),
+    items: z.array(orderItemSchema).min(1),
+});
+
+export const updateOrderStatusSchema = z.object({
+    id,
+    status: orderStatusSchema,
+});
+
 export const offerCreateSchema = z.object({
     name,
     description: optionalText,

@@ -1,4 +1,4 @@
-export type SqlParam = string | number | boolean | null;
+export type SqlParam = string | number | boolean | null | readonly string[] | readonly number[];
 
 export type OfferType = "FIXED_PRICE" | "PERCENTAGE" | "FIXED_DISCOUNT" | "BUY_X_GET_Y";
 
@@ -171,4 +171,103 @@ export type AttachModifierGroupResponse = {
     success: true;
     product_id: string;
     modifier_group_id: string;
+};
+
+export type OrderStatus =
+    | "received"
+    | "preparing"
+    | "ready"
+    | "delivered"
+    | "completed"
+    | "refunded"
+    | "cancelled";
+
+export type OrderItemModifierRequest = {
+    id: string;
+    name: string;
+    price: number;
+    quantity?: number;
+};
+
+export type OrderItemRequest = {
+    product_id: string;
+    quantity: number;
+    price: number;
+    sauce_choice?: string;
+    notes?: string;
+    modifiers?: OrderItemModifierRequest[];
+};
+
+export type CreateOrderRequest = {
+    branch_id: string;
+    customer_name: string;
+    customer_phone?: string;
+    customer_email?: string;
+    customer_address1?: string;
+    customer_address2?: string;
+    customer_city?: string;
+    customer_postcode?: string;
+    is_pickup?: boolean;
+    delivery_fee?: number;
+    total: number;
+    order_status?: OrderStatus;
+    order_notes?: string;
+    payment_id: string;
+    items: OrderItemRequest[];
+};
+
+export type OrderItemModifier = {
+    modifier_id: string | null;
+    name: string;
+    price: number;
+    quantity: number;
+};
+
+export type OrderItem = {
+    product_id: string;
+    product_name: string;
+    quantity: number;
+    price: number;
+    sauce_choice: string | null;
+    notes: string | null;
+    modifiers: OrderItemModifier[];
+};
+
+export type Order = {
+    id: string;
+    branch_id: string;
+    customer_name: string;
+    customer_phone: string | null;
+    customer_email: string | null;
+    customer_address1: string | null;
+    customer_address2: string | null;
+    customer_city: string | null;
+    customer_postcode: string | null;
+    is_pickup: boolean;
+    delivery_fee: number | null;
+    total: number;
+    order_status: OrderStatus;
+    order_notes: string | null;
+    payment_id: string | null;
+    created_at: Date;
+    items: OrderItem[];
+};
+
+export type OrdersResponse = {
+    orders: Order[];
+};
+
+export type CreateOrderResponse = {
+    order_id: string;
+    message: string;
+};
+
+export type UpdateOrderStatusRequest = {
+    id: string;
+    status: OrderStatus;
+};
+
+export type UpdateOrderStatusResponse = {
+    id: string;
+    order_status: OrderStatus;
 };

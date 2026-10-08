@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import dns from "node:dns";
 import { CONFIG } from "./config";
 import { badRequest, conflict } from "./errors";
 import type { SqlParam } from "./types";
@@ -12,10 +13,13 @@ const PG_DATA_EXCEPTION_CLASS = "22";
 
 const DB_CLOSE_TIMEOUT_SECONDS = 5;
 
+dns.setDefaultResultOrder("ipv4first");
+
 const sql = postgres(CONFIG.databaseUrl, {
     max: CONFIG.dbPoolMax,
     idle_timeout: 20,
     connect_timeout: 10,
+    ssl: "require",
     onnotice: () => {},
 });
 
