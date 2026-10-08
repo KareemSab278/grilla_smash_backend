@@ -1,3 +1,11 @@
+/*
+    BUSINESS ROUTES - ONE BUSINESS PER DEPLOYMENT.
+
+    GET  /business              the business, or null when it has not been created yet
+    POST /business              create it (400 if one already exists, also enforced by a unique index)
+    PUT  /business/:businessId  partial update
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

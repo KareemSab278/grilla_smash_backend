@@ -1,15 +1,28 @@
+/*
+    DATABASE LAYER - POSTGRES (SUPABASE) CONNECTION POOL + QUERY HELPERS.
+
+    - dbAll / dbGet / dbRun take a Db handle, which is either the pool (sql) or a transaction handle (tx),
+      so the same helper works inside and outside a transaction. Always use the tx handle inside transaction().
+    - Only static SQL from queries.ts is ever passed in, values always go through $1, $2... parameters.
+    - ssl is required (Supabase only accepts TLS) and DNS prefers IPv4 because the direct Supabase host can
+      resolve to IPv6 which many networks cannot reach (ECONNREFUSED on an IPv6 address).
+    - mapDbError turns constraint failures (unique / foreign key / check / bad data) into 4xx responses.
+*/
+
 import postgres from "postgres";
 import dns from "node:dns";
 import { CONFIG } from "./config";
 import { badRequest, conflict } from "./errors";
 import type { SqlParam } from "./types";
 
-// postgres error codes: https://www.postgresql.org/docs/current/errcodes-appendix.html
-const PG_UNIQUE_VIOLATION = "23505";
-const PG_FOREIGN_KEY_VIOLATION = "23503";
-const PG_CHECK_VIOLATION = "23514";
-const PG_NOT_NULL_VIOLATION = "23502";
-const PG_DATA_EXCEPTION_CLASS = "22";
+// postgres error codes:
+const PG_VIOLATION = {
+    UNIQUE: "23505",
+    FOREIGN_KEY: "23503",
+    CHECK: "23514",
+    NOT_NULL: "23502",
+    DATA_EXCEPTION_CLASS: "22",
+};
 
 const DB_CLOSE_TIMEOUT_SECONDS = 5;
 
@@ -70,13 +83,13 @@ export const mapDbError = (err: unknown): unknown => {
     const code = getPgCode(err);
     if (code === undefined) return err;
 
-    if (code === PG_UNIQUE_VIOLATION) return conflict("A record with those values already exists");
+    if (code === PG_VIOLATION.UNIQUE) return conflict("A record with those values already exists");
 
-    if (code === PG_FOREIGN_KEY_VIOLATION) {
+    if (code === PG_VIOLATION.FOREIGN_KEY) {
         return conflict("Record is still referenced by other data (or references something that does not exist)");
     }
 
-    if (code === PG_CHECK_VIOLATION || code === PG_NOT_NULL_VIOLATION || code.startsWith(PG_DATA_EXCEPTION_CLASS)) {
+    if (code === PG_VIOLATION.CHECK || code === PG_VIOLATION.NOT_NULL || code.startsWith(PG_VIOLATION.DATA_EXCEPTION_CLASS)) {
         return badRequest("One or more values are invalid");
     }
 

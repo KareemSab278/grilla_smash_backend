@@ -1,8 +1,11 @@
 /*
-    EVERY QUERY IS STATIC - NEVER BUILD SQL FROM USER INPUT.
+    ALL SQL LIVES HERE - EVERY QUERY IS STATIC, NEVER BUILD SQL FROM USER INPUT.
+
+    Grouped by HTTP verb (GET / POST / PUT / PATCH / DELETE) in the QUERIES object at the bottom.
+    Values are always bound as $1, $2... parameters.
 
     UPDATE queries use COALESCE($n, column) so a null param means "leave this column alone".
-    updated_at is maintained by a trigger (see database/schema.sql).
+    updated_at is maintained by a trigger (see schema.txt).
     Queries taking an optional parent id use ($1::text IS NULL OR parent_id = $1) so the same statement
     serves both "list everything" and "just this one" (lets us batch child rows instead of N+1).
     Writes that return RETURNING * / RETURNING id give back no row when the id does not exist (-> 404).
@@ -394,6 +397,138 @@ INSERT INTO offer_rule_modifiers (offer_rule_id, modifier_group_id, modifier_id)
 VALUES ($1, $2, $3);
 `;
 
+// ========================================
+// ORDERS
+// ========================================
+
+// serialises order-number allocation per branch for the rest of the transaction
+const lockBranchOrdersQuery: string = `SELECT pg_advisory_xact_lock(hashtext($1));`;
+
+const getNextOrderNumberQuery: string = `
+SELECT COALESCE(MAX(order_number), 0) + 1 AS next_number
+FROM orders
+WHERE branch_id = $1;
+`;
+
+const getActiveOrdersQuery: string = `
+SELECT *
+FROM orders
+WHERE branch_id = $1
+  AND status = ANY($2::text[])
+ORDER BY created_at DESC;
+`;
+
+const getOrderHistoryQuery: string = `
+SELECT *
+FROM orders
+WHERE branch_id = $1
+  AND created_at >= NOW() - INTERVAL '30 days'
+ORDER BY created_at DESC;
+`;
+
+const getOrderItemsQuery: string = `
+SELECT *
+FROM order_items
+WHERE order_id = ANY($1::text[])
+ORDER BY name, id;
+`;
+
+const getOrderItemModifiersQuery: string = `
+SELECT *
+FROM order_item_modifiers
+WHERE order_item_id = ANY($1::text[])
+ORDER BY name, id;
+`;
+
+const getOrderPricingProductsQuery: string = `
+SELECT
+    p.id,
+    p.name,
+    p.active,
+    p.price,
+    bpo.active AS branch_active,
+    bpo.price_override
+FROM products p
+LEFT JOIN branch_product_overrides bpo
+    ON bpo.product_id = p.id
+    AND bpo.branch_id = $1
+WHERE p.id = ANY($2::text[]);
+`;
+
+const getOrderPricingGroupsQuery: string = `
+SELECT
+    pmg.product_id,
+    mg.id,
+    mg.name,
+    mg.required,
+    mg.min_selections,
+    mg.max_selections
+FROM product_modifier_groups pmg
+JOIN modifier_groups mg
+    ON mg.id = pmg.modifier_group_id
+WHERE mg.active
+  AND pmg.product_id = ANY($1::text[]);
+`;
+
+const getOrderPricingModifiersQuery: string = `
+SELECT
+    pmg.product_id,
+    m.id,
+    m.modifier_group_id,
+    m.name,
+    m.price
+FROM product_modifier_groups pmg
+JOIN modifiers m
+    ON m.modifier_group_id = pmg.modifier_group_id
+WHERE m.active
+  AND pmg.product_id = ANY($1::text[]);
+`;
+
+const createOrderQuery: string = `
+INSERT INTO orders (
+    id,
+    branch_id,
+    order_number,
+    order_type,
+    customer_name,
+    customer_phone,
+    customer_email,
+    address_line1,
+    address_line2,
+    city,
+    postcode,
+    subtotal,
+    delivery_fee,
+    discount,
+    total,
+    notes
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+RETURNING *;
+`;
+
+const createOrderItemQuery: string = `
+INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, total, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+`;
+
+const createOrderItemModifierQuery: string = `
+INSERT INTO order_item_modifiers (id, order_item_id, modifier_id, name, price, quantity)
+VALUES ($1, $2, $3, $4, $5, 1);
+`;
+
+const createPaymentQuery: string = `
+INSERT INTO payments (id, order_id, provider, provider_payment_id, amount, status)
+VALUES ($1, $2, $3, $4, $5, 'PENDING');
+`;
+
+const updateOrderStatusQuery: string = `
+UPDATE orders
+SET status = $2
+WHERE id = $1
+RETURNING id, status;
+`;
+
 export const QUERIES = {
     GET: {
         BUSINESS: getBusinessQuery,
@@ -426,6 +561,15 @@ export const QUERIES = {
         OFFER_RULE_PRODUCTS: getOfferRuleProductsQuery,
         OFFER_RULE_GROUPS: getOfferRuleGroupsQuery,
         OFFER_RULE_MODIFIERS: getOfferRuleModifiersQuery,
+
+        NEXT_ORDER_NUMBER: getNextOrderNumberQuery,
+        ACTIVE_ORDERS: getActiveOrdersQuery,
+        ORDER_HISTORY: getOrderHistoryQuery,
+        ORDER_ITEMS: getOrderItemsQuery,
+        ORDER_ITEM_MODIFIERS: getOrderItemModifiersQuery,
+        ORDER_PRICING_PRODUCTS: getOrderPricingProductsQuery,
+        ORDER_PRICING_GROUPS: getOrderPricingGroupsQuery,
+        ORDER_PRICING_MODIFIERS: getOrderPricingModifiersQuery,
     },
 
     POST: {
@@ -441,6 +585,11 @@ export const QUERIES = {
         OFFER_RULE_PRODUCT: createOfferRuleProductQuery,
         OFFER_RULE_GROUP: createOfferRuleGroupQuery,
         OFFER_RULE_MODIFIER: createOfferRuleModifierQuery,
+        LOCK_BRANCH_ORDERS: lockBranchOrdersQuery,
+        ORDER: createOrderQuery,
+        ORDER_ITEM: createOrderItemQuery,
+        ORDER_ITEM_MODIFIER: createOrderItemModifierQuery,
+        PAYMENT: createPaymentQuery,
     },
 
     PUT: {
@@ -453,6 +602,10 @@ export const QUERIES = {
         OFFER: updateOfferQuery,
         PRODUCT_MODIFIER_GROUP: attachModifierGroupQuery,
         BRANCH_PRODUCT_OVERRIDE: setBranchProductOverrideQuery,
+    },
+
+    PATCH: {
+        ORDER_STATUS: updateOrderStatusQuery,
     },
 
     DELETE: {

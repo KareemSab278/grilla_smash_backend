@@ -1,3 +1,13 @@
+/*
+    CATEGORY ROUTES
+
+    GET    /categories              by sort_order, then name
+    GET    /categories/:categoryId
+    POST   /categories
+    PUT    /categories/:categoryId  partial update
+    DELETE /categories/:categoryId  products stay, only the link is removed
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

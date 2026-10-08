@@ -1,3 +1,11 @@
+/*
+    ERROR MIDDLEWARE - EVERY ERROR LEAVES THE API AS { "detail": "message" }.
+
+    That shape is what Admin/script.js and Frontend/script.js already read.
+    HttpError -> its own status, db constraint errors -> 409 / 400 (see db.mapDbError),
+    malformed JSON -> 400, anything else -> logged and returned as a generic 500 (details never leak).
+*/
+
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import { HttpError, notFound } from "../errors";
 import { mapDbError } from "../db";

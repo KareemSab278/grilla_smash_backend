@@ -1,3 +1,16 @@
+/*
+    OFFER ROUTES - CONFIGURABLE BUNDLES / DISCOUNTS (offer -> rules -> products + modifier groups + modifiers).
+
+    GET    /offers
+    GET    /offers/:offerId
+    POST   /offers
+    PUT    /offers/:offerId   partial update, rules (when sent) REPLACE all existing rules
+    DELETE /offers/:offerId
+    Rules are validated before anything is written (products / groups / modifiers must exist, modifiers must
+    belong to the group, min <= max, required needs min >= 1). Everything is saved in one transaction.
+    Note: offers are stored and returned, but are not yet applied when pricing an order.
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

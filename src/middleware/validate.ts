@@ -1,3 +1,9 @@
+/*
+    VALIDATION MIDDLEWARE - parseInput(schema, input) RETURNS TYPED DATA OR THROWS A 422.
+
+    The message lists every failing field, e.g. "price: Too small: expected number to be >=0".
+*/
+
 import type { z } from "zod";
 import { unprocessable } from "../errors";
 

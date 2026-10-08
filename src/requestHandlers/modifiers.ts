@@ -1,3 +1,12 @@
+/*
+    MODIFIER ROUTES - THE INDIVIDUAL OPTIONS INSIDE A GROUP (e.g. "Mayo", "Large").
+
+    POST   /modifier-groups/:groupId/modifiers
+    PUT    /modifiers/:modifierId
+    DELETE /modifiers/:modifierId
+    Price is the extra cost in pence.
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

@@ -1,3 +1,13 @@
+/*
+    BRANCH ROUTES
+
+    GET    /branches            all branches, by name
+    GET    /branches/:branchId
+    POST   /branches
+    PUT    /branches/:branchId  partial update
+    DELETE /branches/:branchId  409 while the branch still has orders
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

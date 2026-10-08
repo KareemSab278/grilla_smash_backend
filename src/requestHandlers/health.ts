@@ -1,3 +1,10 @@
+/*
+    HEALTH ROUTES
+
+    GET /          api name / version
+    GET /health    pings the database, 500 when it is unreachable (so uptime monitors see real health)
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { checkDb } from "../db";

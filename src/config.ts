@@ -1,3 +1,11 @@
+/*
+    ENV CONFIG - THE ONLY FILE THAT READS process.env.
+
+    Loads ./.env (if present) from the working directory, validates everything once at startup and exports
+    a frozen CONFIG object. A bad value throws immediately so the server never starts half configured.
+    The database url is SUPABASE_DB_URL, falling back to DATABASE_URL.
+*/
+
 import { existsSync } from "node:fs";
 import path from "node:path";
 

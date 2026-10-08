@@ -1,3 +1,13 @@
+/*
+    MODIFIER GROUP ROUTES - e.g. "Sauces", "Size", "Extras". Groups come back with their modifiers.
+
+    GET    /modifier-groups
+    GET    /modifier-groups/:groupId
+    POST   /modifier-groups
+    PUT    /modifier-groups/:groupId   min/max are validated against the stored values (row is locked)
+    DELETE /modifier-groups/:groupId   deletes its modifiers too
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

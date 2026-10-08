@@ -1,3 +1,11 @@
+/*
+    BRANCH PRODUCT OVERRIDES - PER BRANCH PRICE / AVAILABILITY.
+
+    GET    /branches/:branchId/products             active products with effective_price (override or base price)
+    PUT    /branches/:branchId/products/:productId  set { active, price_override }, null = use the normal value
+    DELETE /branches/:branchId/products/:productId  remove the override
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

@@ -1,3 +1,12 @@
+/*
+    TYPES - SHAPES OF DATABASE ROWS AND API RESPONSES.
+
+    *Row        1:1 with a table in schema.txt (booleans are real booleans, timestamps are Date)
+    *JoinRow    a row plus the id of its parent, used to batch-load children in one query
+    *Response   what the API actually returns (a row plus nested children)
+    Request body types are NOT here, they are inferred from the zod schemas in schemas.ts.
+*/
+
 export type SqlParam = string | number | boolean | null | readonly string[] | readonly number[];
 
 export type OfferType = "FIXED_PRICE" | "PERCENTAGE" | "FIXED_DISCOUNT" | "BUY_X_GET_Y";
@@ -173,101 +182,99 @@ export type AttachModifierGroupResponse = {
     modifier_group_id: string;
 };
 
-export type OrderStatus =
-    | "received"
-    | "preparing"
-    | "ready"
-    | "delivered"
-    | "completed"
-    | "refunded"
-    | "cancelled";
+// ========================================
+// ORDERS
+// ========================================
 
-export type OrderItemModifierRequest = {
+export type OrderType = "PICKUP" | "DELIVERY";
+
+export type OrderStatus =   "PENDING" | "ACCEPTED" | "PREPARING" |
+                            "READY" | "COMPLETED" | "CANCELLED" | "REFUNDED";
+
+export type OrderRow = {
     id: string;
-    name: string;
-    price: number;
-    quantity?: number;
-};
-
-export type OrderItemRequest = {
-    product_id: string;
-    quantity: number;
-    price: number;
-    sauce_choice?: string;
-    notes?: string;
-    modifiers?: OrderItemModifierRequest[];
-};
-
-export type CreateOrderRequest = {
     branch_id: string;
+    order_number: number;
+    order_type: OrderType;
+    status: OrderStatus;
     customer_name: string;
-    customer_phone?: string;
-    customer_email?: string;
-    customer_address1?: string;
-    customer_address2?: string;
-    customer_city?: string;
-    customer_postcode?: string;
-    is_pickup?: boolean;
-    delivery_fee?: number;
+    customer_phone: string | null;
+    customer_email: string | null;
+    address_line1: string | null;
+    address_line2: string | null;
+    city: string | null;
+    postcode: string | null;
+    subtotal: number;
+    delivery_fee: number;
+    discount: number;
     total: number;
-    order_status?: OrderStatus;
-    order_notes?: string;
-    payment_id: string;
-    items: OrderItemRequest[];
+    notes: string | null;
+    created_at: Date;
+    updated_at: Date;
 };
 
-export type OrderItemModifier = {
+// name and unit_price are snapshots taken when the order was placed
+export type OrderItemRow = {
+    id: string;
+    order_id: string;
+    product_id: string | null;
+    offer_id: string | null;
+    offer_rule_id: string | null;
+    name: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+    notes: string | null;
+};
+
+export type OrderItemModifierRow = {
+    id: string;
+    order_item_id: string;
     modifier_id: string | null;
     name: string;
     price: number;
     quantity: number;
 };
 
-export type OrderItem = {
-    product_id: string;
-    product_name: string;
-    quantity: number;
-    price: number;
-    sauce_choice: string | null;
-    notes: string | null;
-    modifiers: OrderItemModifier[];
+export type OrderItemResponse = OrderItemRow & {
+    modifiers: OrderItemModifierRow[];
 };
 
-export type Order = {
-    id: string;
-    branch_id: string;
-    customer_name: string;
-    customer_phone: string | null;
-    customer_email: string | null;
-    customer_address1: string | null;
-    customer_address2: string | null;
-    customer_city: string | null;
-    customer_postcode: string | null;
-    is_pickup: boolean;
-    delivery_fee: number | null;
-    total: number;
-    order_status: OrderStatus;
-    order_notes: string | null;
-    payment_id: string | null;
-    created_at: Date;
-    items: OrderItem[];
+export type OrderResponse = OrderRow & {
+    items: OrderItemResponse[];
 };
 
-export type OrdersResponse = {
-    orders: Order[];
-};
-
-export type CreateOrderResponse = {
-    order_id: string;
-    message: string;
-};
-
-export type UpdateOrderStatusRequest = {
+export type OrderStatusResponse = {
     id: string;
     status: OrderStatus;
 };
 
-export type UpdateOrderStatusResponse = {
+// ========================================
+// ORDER PRICING (rows used to price + validate a new order)
+// ========================================
+
+export type OrderPricingProductRow = {
     id: string;
-    order_status: OrderStatus;
+    name: string;
+    active: boolean;
+    price: number;
+    branch_active: boolean | null;
+    price_override: number | null;
+};
+
+export type OrderPricingGroupRow = {
+    product_id: string;
+    id: string;
+    name: string;
+    required: boolean;
+    min_selections: number;
+    max_selections: number;
+};
+
+export type OrderPricingModifierRow = {
+    product_id: string;
+    id: string;
+    modifier_group_id: string;
+    name: string;
+    price: number;
 };

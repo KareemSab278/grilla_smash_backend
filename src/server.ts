@@ -1,3 +1,12 @@
+/*
+    ENTRY POINT - BUILDS THE EXPRESS APP AND STARTS LISTENING.
+
+    Middleware order matters: cors -> json body parser -> routers -> notFoundHandler -> errorHandler.
+    Every router is mounted at the root (no /api prefix) because Admin and Frontend call these paths directly.
+    On SIGINT / SIGTERM it stops accepting requests, lets in-flight ones finish, then closes the db pool
+    (forced exit after SHUTDOWN_TIMEOUT_MS so a stuck connection can never hang a deploy).
+*/
+
 import express from "express";
 import cors from "cors";
 import { CONFIG } from "./config";

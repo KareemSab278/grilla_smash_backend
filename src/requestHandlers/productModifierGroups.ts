@@ -1,3 +1,12 @@
+/*
+    PRODUCT <-> MODIFIER GROUP LINKS - WHICH GROUPS A PRODUCT OFFERS.
+
+    GET    /products/:productId/modifier-groups           groups with ACTIVE modifiers only (storefront view)
+    POST   /products/:productId/modifier-groups           attach (or re-sort) a group
+    DELETE /products/:productId/modifier-groups/:groupId  detach
+    Orders are validated against these links, a modifier can only be ordered on a product it is attached to.
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";

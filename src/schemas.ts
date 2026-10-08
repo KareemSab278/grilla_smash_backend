@@ -1,3 +1,17 @@
+/*
+    REQUEST VALIDATION - ZOD SCHEMAS FOR EVERY REQUEST BODY / QUERY.
+
+    Handlers call parseInput(schema, req.body) (middleware/validate.ts), which returns fully typed data or
+    throws a 422. The exported types at the bottom are inferred from the schemas, so validation and
+    TypeScript types can never drift apart.
+
+    Conventions:
+    - *CreateSchema   required fields + defaults
+    - *UpdateSchema   every field optional, null / omitted means "leave unchanged"
+    - money is an integer in pence (£8.99 = 899)
+    - unknown fields are stripped (e.g. a client sending its own price on an order is simply ignored)
+*/
+
 import { z } from "zod";
 
 // ========================================
@@ -187,59 +201,6 @@ const offerRuleSchema = z.object({
     modifier_groups: z.array(offerRuleModifierGroupSchema).default([]),
 });
 
-const orderStatusSchema = z.enum([
-    "received",
-    "preparing",
-    "ready",
-    "delivered",
-    "completed",
-    "refunded",
-    "cancelled",
-]);
-
-// ========================================
-// ORDERS
-// ========================================
-
-const orderItemModifierSchema = z.object({
-    id,
-    name,
-    price: pence,
-    quantity: z.int().min(1).default(1),
-});
-
-const orderItemSchema = z.object({
-    product_id: id,
-    quantity: z.int().min(1),
-    price: pence,
-    sauce_choice: z.string().trim().min(1).nullish(),
-    notes: z.string().trim().max(2000).nullish(),
-    modifiers: z.array(orderItemModifierSchema).default([]),
-});
-
-export const createOrderSchema = z.object({
-    branch_id: id,
-    customer_name: name,
-    customer_phone: z.string().trim().min(1).nullish(),
-    customer_email: z.string().trim().email().nullish(),
-    customer_address1: z.string().trim().min(1).nullish(),
-    customer_address2: z.string().trim().min(1).nullish(),
-    customer_city: z.string().trim().min(1).nullish(),
-    customer_postcode: z.string().trim().min(1).nullish(),
-    is_pickup: z.boolean().default(false),
-    delivery_fee: pence.nullish(),
-    total: pence,
-    order_status: orderStatusSchema.default("received"),
-    order_notes: z.string().trim().max(4000).nullish(),
-    payment_id: z.string().trim().min(1),
-    items: z.array(orderItemSchema).min(1),
-});
-
-export const updateOrderStatusSchema = z.object({
-    id,
-    status: orderStatusSchema,
-});
-
 export const offerCreateSchema = z.object({
     name,
     description: optionalText,
@@ -269,6 +230,54 @@ export const offerUpdateSchema = z.object({
 });
 
 // ========================================
+// ORDERS
+// Prices are never accepted from the client, the server prices every order from the database
+// ========================================
+
+export const ORDER_TYPES = ["PICKUP", "DELIVERY"] as const;
+export const ORDER_STATUSES = ["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "CANCELLED"] as const;
+
+const optionalShortText = z.string().trim().min(1).nullish();
+
+const orderItemSchema = z.object({
+    product_id: id,
+    quantity: z.int().min(1).max(99),
+    notes: z.string().trim().max(1000).nullish(),
+    modifier_ids: z.array(id).default([]),
+});
+
+const orderPaymentSchema = z.object({
+    provider: name,
+    provider_payment_id: optionalShortText,
+});
+
+export const orderCreateSchema = z
+    .object({
+        branch_id: id,
+        order_type: z.enum(ORDER_TYPES).default("PICKUP"),
+        customer_name: name,
+        customer_phone: optionalShortText,
+        customer_email: z.email().nullish(),
+        address_line1: optionalShortText,
+        address_line2: optionalShortText,
+        city: optionalShortText,
+        postcode: optionalShortText,
+        delivery_fee: pence.default(0),
+        notes: z.string().trim().max(2000).nullish(),
+        items: z.array(orderItemSchema).min(1).max(100),
+        payment: orderPaymentSchema.nullish(),
+    })
+    .refine(
+        order => order.order_type === "PICKUP" || (order.address_line1 && order.city && order.postcode),
+        "address_line1, city and postcode are required for DELIVERY orders"
+    );
+
+export const orderStatusUpdateSchema = z.object({
+    id,
+    status: z.enum(ORDER_STATUSES),
+});
+
+// ========================================
 // INFERRED REQUEST TYPES
 // ========================================
 
@@ -290,3 +299,5 @@ export type OfferRuleModifierGroupInput = z.infer<typeof offerRuleModifierGroupS
 export type OfferRuleInput = z.infer<typeof offerRuleSchema>;
 export type OfferCreate = z.infer<typeof offerCreateSchema>;
 export type OfferUpdate = z.infer<typeof offerUpdateSchema>;
+export type OrderCreate = z.infer<typeof orderCreateSchema>;
+export type OrderStatusUpdate = z.infer<typeof orderStatusUpdateSchema>;

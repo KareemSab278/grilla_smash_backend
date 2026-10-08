@@ -1,3 +1,12 @@
+/*
+    SHARED HELPERS - SMALL, GENERIC UTILITIES USED BY SEVERAL HANDLERS.
+
+    ids        newId() gives 12 hex chars (same shape as the old backend)
+    nulls      orNull() maps undefined -> null so a value can be bound as a sql parameter
+    lookups    getRequiredRow / requireRow / deleteById throw a 404 when the row is missing
+    batching   groupBy() lets handlers load all child rows in one query and stitch them in memory (no N+1)
+*/
+
 import { randomBytes } from "node:crypto";
 import { notFound } from "./errors";
 import { dbGet } from "./db";

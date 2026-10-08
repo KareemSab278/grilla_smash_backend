@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# End to end smoke test of every endpoint, in dependency order (business -> branch -> category -> product ->
+# modifiers -> offer -> order). Each POST captures the returned id and the later calls reuse it.
+#
+#   ./curl-tests.sh                                     against http://127.0.0.1:8000
+#   BASE_URL=https://your-host ./curl-tests.sh          against another server
+#
+# Needs: the backend running, curl, python3. It creates real rows, and only one business is allowed,
+# so a second run against the same database stops at TEST 02 ("Business already exists").
+
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
 JSON="Content-Type: application/json"
 
@@ -243,54 +252,62 @@ curl -sS -X PUT "$BASE_URL/offers/$offer_id" \
 echo
 
 section "TEST 11 - ORDERS"
+# TEST 08 detached the sauce group, attach it again so the modifier below is valid for the product
+curl -sS -X POST "$BASE_URL/products/$product_id/modifier-groups" \
+  -H "$JSON" \
+  -d "{\"modifier_group_id\": \"$group_id\", \"sort_order\": 0}"
+echo
+
+echo "-- create order (prices are calculated by the server, only ids are sent)"
 order_id="$(
   curl -sS -X POST "$BASE_URL/orders" \
     -H "$JSON" \
     -d "{
       \"branch_id\": \"$branch_id\",
+      \"order_type\": \"DELIVERY\",
       \"customer_name\": \"Jordan Test\",
       \"customer_phone\": \"07000000000\",
       \"customer_email\": \"jordan@example.com\",
-      \"customer_address1\": \"1 Test Street\",
-      \"customer_address2\": null,
-      \"customer_city\": \"London\",
-      \"customer_postcode\": \"SW1A 1AA\",
-      \"is_pickup\": true,
-      \"delivery_fee\": 0,
-      \"total\": 999,
-      \"order_status\": \"received\",
-      \"order_notes\": \"No onions please\",
-      \"payment_id\": \"pay_test_123\",
+      \"address_line1\": \"1 Test Street\",
+      \"city\": \"London\",
+      \"postcode\": \"SW1A 1AA\",
+      \"delivery_fee\": 250,
+      \"notes\": \"No onions please\",
       \"items\": [
         {
           \"product_id\": \"$product_id\",
-          \"quantity\": 1,
-          \"price\": 999,
-          \"sauce_choice\": \"Mild\",
+          \"quantity\": 2,
           \"notes\": \"Extra crispy\",
-          \"modifiers\": [
-            {
-              \"id\": \"$modifier_id\",
-              \"name\": \"Spicy Mayo\",
-              \"price\": 25,
-              \"quantity\": 1
-            }
-          ]
+          \"modifier_ids\": [\"$modifier_id\"]
         }
-      ]
+      ],
+      \"payment\": { \"provider\": \"stripe\", \"provider_payment_id\": \"pi_test_123\" }
     }" | extract_id
 )"
 echo "Created order id: $order_id"
-curl -sS -X GET "$BASE_URL/orders/$branch_id"
-echo
-curl -sS -X GET "$BASE_URL/orders/history/$branch_id"
-echo
-curl -sS -X PATCH "$BASE_URL/orders/status" \
+
+echo "-- missing required modifier is rejected (400)"
+curl -sS -X POST "$BASE_URL/orders" \
   -H "$JSON" \
   -d "{
-    \"id\": \"$order_id\",
-    \"status\": \"preparing\"
+    \"branch_id\": \"$branch_id\",
+    \"customer_name\": \"Jordan Test\",
+    \"items\": [{ \"product_id\": \"$product_id\", \"quantity\": 1 }]
   }"
+echo
+
+echo "-- active orders for the branch"
+curl -sS -X GET "$BASE_URL/orders/$branch_id"
+echo
+
+echo "-- last 30 days of orders for the branch"
+curl -sS -X GET "$BASE_URL/orders/history/$branch_id"
+echo
+
+echo "-- update status"
+curl -sS -X PATCH "$BASE_URL/orders/status" \
+  -H "$JSON" \
+  -d "{ \"id\": \"$order_id\", \"status\": \"PREPARING\" }"
 echo
 
 section "TEST 12 - NOT IMPLEMENTED YET"

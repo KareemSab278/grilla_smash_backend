@@ -1,3 +1,14 @@
+/*
+    PRODUCT ROUTES - PRODUCTS ALWAYS COME BACK WITH THEIR CATEGORIES.
+
+    GET    /products                 optional ?active_only=true
+    GET    /products/:productId
+    POST   /products                 category_ids links the product to existing categories
+    PUT    /products/:productId      partial update, category_ids (when sent) REPLACES the whole list
+    DELETE /products/:productId
+    Price is an integer in pence.
+*/
+
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";
