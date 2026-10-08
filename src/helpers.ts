@@ -1,0 +1,58 @@
+import { randomBytes } from "node:crypto";
+import { notFound } from "./errors";
+import { dbGet } from "./db";
+import type { Db } from "./db";
+import type { DeleteResponse, SqlParam } from "./types";
+
+// 12 hex chars, same shape as the ids the old backend generated
+export const newId = (): string => randomBytes(6).toString("hex");
+
+// null/undefined = "leave the column alone" (paired with COALESCE in the UPDATE queries)
+export const orNull = <T extends SqlParam>(value: T | undefined): T | null => value ?? null;
+
+export const getRequiredRow = async <T extends object>(
+    db: Db,
+    query: string,
+    id: string,
+    label: string
+): Promise<T> => {
+    const row = await dbGet<T>(db, query, [id]);
+    if (!row) throw notFound(`${label} not found`);
+    return row;
+};
+
+export const requireRow = <T>(row: T | undefined, label: string): T => {
+    if (row === undefined) throw notFound(`${label} not found`);
+    return row;
+};
+
+export const deleteById = async (db: Db, query: string, id: string, label: string): Promise<DeleteResponse> => {
+    requireRow(await dbGet(db, query, [id]), label);
+    return { success: true, deleted: id };
+};
+
+export const groupBy = <T, K extends string>(items: readonly T[], getKey: (item: T) => K): Map<K, T[]> => {
+    const groups = new Map<K, T[]>();
+
+    for (const item of items) {
+        const key = getKey(item);
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(item);
+        else groups.set(key, [item]);
+    }
+
+    return groups;
+};
+
+export const unique = <T>(values: readonly T[]): T[] => [...new Set(values)];
+
+export const findDuplicate = (values: readonly string[]): string | undefined => {
+    const seen = new Set<string>();
+
+    for (const value of values) {
+        if (seen.has(value)) return value;
+        seen.add(value);
+    }
+
+    return undefined;
+};

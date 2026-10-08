@@ -1,0 +1,63 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
+const ENV_PATH = path.resolve(process.cwd(), ".env");
+
+if (existsSync(ENV_PATH)) {
+    process.loadEnvFile(ENV_PATH);
+}
+
+const DEFAULT_PORT = 8000;
+const DEFAULT_HOST = "127.0.0.1";
+const DEFAULT_DB_POOL_MAX = 10;
+const DEFAULT_CORS_ORIGINS: readonly string[] = [
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3001",
+    "http://localhost:3001",
+];
+
+type Config = {
+    readonly port: number;
+    readonly host: string;
+    readonly databaseUrl: string;
+    readonly dbPoolMax: number;
+    readonly corsOrigins: readonly string[];
+};
+
+const parseInteger = (name: string, raw: string | undefined, fallback: number, min: number, max: number): number => {
+    if (raw === undefined || raw === "") return fallback;
+
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < min || value > max) {
+        throw new Error(`Invalid ${name}: ${raw}`);
+    }
+
+    return value;
+};
+
+const getDatabaseUrl = (): string => {
+    const value = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+    if (!value) {
+        throw new Error("SUPABASE_DB_URL or DATABASE_URL missing");
+    }
+
+    return value;
+};
+
+const parseList = (raw: string | undefined): readonly string[] => {
+    if (raw === undefined || raw.trim() === "") return DEFAULT_CORS_ORIGINS;
+
+    return raw
+        .split(",")
+        .map(origin => origin.trim())
+        .filter(origin => origin !== "");
+};
+
+export const CONFIG: Config = {
+    port: parseInteger("PORT", process.env.PORT, DEFAULT_PORT, 0, 65535),
+    host: process.env.HOST || DEFAULT_HOST,
+    databaseUrl: getDatabaseUrl(),
+    dbPoolMax: parseInteger("DB_POOL_MAX", process.env.DB_POOL_MAX, DEFAULT_DB_POOL_MAX, 1, 100),
+    corsOrigins: parseList(process.env.CORS_ORIGINS),
+};
