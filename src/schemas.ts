@@ -246,6 +246,23 @@ const orderItemSchema = z.object({
     modifier_ids: z.array(id).default([]),
 });
 
+// one bundle: the offer plus the products (and modifiers) picked for each of its rules
+const orderOfferItemSchema = z.object({
+    product_id: id,
+    modifier_ids: z.array(id).default([]),
+});
+
+const orderOfferRuleSchema = z.object({
+    offer_rule_id: id,
+    items: z.array(orderOfferItemSchema).min(1).max(100),
+});
+
+const orderOfferSchema = z.object({
+    offer_id: id,
+    quantity: z.int().min(1).max(99).default(1),
+    rules: z.array(orderOfferRuleSchema).min(1).max(50),
+});
+
 const orderPaymentSchema = z.object({
     provider: name,
     provider_payment_id: optionalShortText,
@@ -264,9 +281,11 @@ export const orderCreateSchema = z
         postcode: optionalShortText,
         delivery_fee: pence.default(0),
         notes: z.string().trim().max(2000).nullish(),
-        items: z.array(orderItemSchema).min(1).max(100),
+        items: z.array(orderItemSchema).max(100).default([]),
+        offers: z.array(orderOfferSchema).max(50).default([]),
         payment: orderPaymentSchema.nullish(),
     })
+    .refine(order => order.items.length + order.offers.length > 0, "An order needs at least one item or offer")
     .refine(
         order => order.order_type === "PICKUP" || (order.address_line1 && order.city && order.postcode),
         "address_line1, city and postcode are required for DELIVERY orders"
@@ -299,5 +318,6 @@ export type OfferRuleModifierGroupInput = z.infer<typeof offerRuleModifierGroupS
 export type OfferRuleInput = z.infer<typeof offerRuleSchema>;
 export type OfferCreate = z.infer<typeof offerCreateSchema>;
 export type OfferUpdate = z.infer<typeof offerUpdateSchema>;
+export type OrderOfferCreate = z.infer<typeof orderOfferSchema>;
 export type OrderCreate = z.infer<typeof orderCreateSchema>;
 export type OrderStatusUpdate = z.infer<typeof orderStatusUpdateSchema>;

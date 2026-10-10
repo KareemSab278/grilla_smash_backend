@@ -30,7 +30,7 @@ type Config = {
     readonly host: string;
     readonly databaseUrl: string;
     readonly dbPoolMax: number;
-    readonly corsOrigins: readonly string[];
+    readonly corsOrigins: string[] | true;
 };
 
 const parseInteger = (name: string, raw: string | undefined, fallback: number, min: number, max: number): number => {
@@ -53,8 +53,9 @@ const getDatabaseUrl = (): string => {
     return value;
 };
 
-const parseList = (raw: string | undefined): readonly string[] => {
+const parseCorsOrigins = (raw: string | undefined): string[] | true => {
     if (raw === undefined || raw.trim() === "") return DEFAULT_CORS_ORIGINS;
+    if (raw.trim() === "*") return true;
 
     return raw
         .split(",")
@@ -67,5 +68,5 @@ export const CONFIG: Config = {
     host: process.env.HOST || DEFAULT_HOST,
     databaseUrl: getDatabaseUrl(),
     dbPoolMax: parseInteger("DB_POOL_MAX", process.env.DB_POOL_MAX, DEFAULT_DB_POOL_MAX, 1, 100),
-    corsOrigins: parseList(process.env.CORS_ORIGINS),
+    corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
 };

@@ -8,7 +8,8 @@
     DELETE /offers/:offerId
     Rules are validated before anything is written (products / groups / modifiers must exist, modifiers must
     belong to the group, min <= max, required needs min >= 1). Everything is saved in one transaction.
-    Note: offers are stored and returned, but are not yet applied when pricing an order.
+    Offers are applied by POST /orders (see requestHandlers/orders.ts + offerPricing.ts).
+    A rule modifier group without restricted modifiers lists every active modifier of the group in responses.
 */
 
 import express from "express";
@@ -79,6 +80,18 @@ const buildOffers = async (db: Db, offers: readonly OfferRow[], offerId: string 
     const groupsByRule = groupBy(ruleGroups, group => group.offer_rule_id);
     const modifiersByRuleGroup = groupBy(ruleModifiers, modifier => `${modifier.offer_rule_id}:${modifier.modifier_group_id}`);
 
+    // a rule group with no restriction offers every active modifier of the group
+    const unrestrictedGroupIds = unique(
+        ruleGroups
+            .filter(group => !modifiersByRuleGroup.has(`${group.offer_rule_id}:${group.id}`))
+            .map(group => group.id)
+    );
+    const groupModifiers =
+        unrestrictedGroupIds.length > 0
+            ? await dbAll<ModifierRow>(db, QUERIES.GET.ACTIVE_MODIFIERS_BY_GROUPS, [unrestrictedGroupIds])
+            : [];
+    const modifiersByGroup = groupBy(groupModifiers, modifier => modifier.modifier_group_id);
+
     return offers.map(offer => ({
         ...offer,
         rules: (rulesByOffer.get(offer.id) ?? []).map(
@@ -88,7 +101,7 @@ const buildOffers = async (db: Db, offers: readonly OfferRow[], offerId: string 
                 modifier_groups: (groupsByRule.get(rule.id) ?? []).map(group =>
                     toRuleGroup(
                         stripRuleId(group),
-                        (modifiersByRuleGroup.get(`${rule.id}:${group.id}`) ?? []).map(stripRuleId)
+                        modifiersByRuleGroup.get(`${rule.id}:${group.id}`)?.map(stripRuleId) ?? modifiersByGroup.get(group.id) ?? []
                     )
                 ),
             })
@@ -96,7 +109,14 @@ const buildOffers = async (db: Db, offers: readonly OfferRow[], offerId: string 
     }));
 };
 
-const loadOffer = async (db: Db, offerId: string): Promise<OfferResponse> => {
+// BUY_X_GET_Y offers are applied to orders automatically, so orders need all of the active ones
+export const loadAutomaticOffers = async (db: Db): Promise<OfferResponse[]> => {
+    const offers = (await dbAll<OfferRow>(db, QUERIES.GET.OFFERS)).filter(offer => offer.active && offer.type === "BUY_X_GET_Y");
+
+    return offers.length > 0 ? buildOffers(db, offers, null) : [];
+};
+
+export const loadOffer = async (db: Db, offerId: string): Promise<OfferResponse> => {
     const offer = await getRequiredRow<OfferRow>(db, QUERIES.GET.OFFER_BY_ID, offerId, "offer");
 
     const [built] = await buildOffers(db, [offer], offerId);

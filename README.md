@@ -70,7 +70,7 @@ PORT=8000
 HOST=127.0.0.1
 SUPABASE_DB_URL=postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres
 DB_POOL_MAX=10
-CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
+CORS_ORIGINS=*
 ```
 
 Take the connection string from **Supabase > Project Settings > Database > Connection string** (use *Session pooler*). If it does not connect, see [Troubleshooting](#13-troubleshooting).
@@ -110,7 +110,7 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `PORT` | no | `8000` | Integer 0 to 65535. |
 | `HOST` | no | `127.0.0.1` | Interface to bind. Use `0.0.0.0` in a container. |
 | `DB_POOL_MAX` | no | `10` | Max pooled connections, integer 1 to 100. |
-| `CORS_ORIGINS` | no | `127.0.0.1` / `localhost` on ports 3000 and 3001 | Comma separated list of allowed browser origins. |
+| `CORS_ORIGINS` | no | `127.0.0.1` / `localhost` on ports 3000 and 3001 | Comma separated list of allowed browser origins, or `*` to allow any browser origin in dev. |
 
 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but **the backend does not use them yet**. They are for Supabase Auth, which is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 
@@ -433,7 +433,7 @@ Validated before anything is written, otherwise 400 / 404: products, groups and 
 }
 ```
 
-> Offers are stored and returned, but are **not applied when pricing an order yet** (see [section 12](#12-known-limitations-and-roadmap)).
+> Offers are applied when an order is created, see [Ordering an offer](#ordering-an-offer). A rule modifier group with no `modifier_ids` lists every active modifier of the group in responses.
 
 ### 8.12 Orders
 
@@ -461,11 +461,12 @@ Body fields:
 | `address_line1`, `address_line2`, `city`, `postcode` | for `DELIVERY` | `address_line1`, `city` and `postcode` are required when delivering |
 | `delivery_fee` | no | Pence, default 0. Only counted for `DELIVERY` |
 | `notes` | no | Up to 2000 characters |
-| `items` | yes | 1 to 100 items |
+| `items` | one of `items` / `offers` | Up to 100 items |
 | `items[].product_id` | yes | |
 | `items[].quantity` | yes | 1 to 99 |
 | `items[].modifier_ids` | no | Modifier ids, each at most once |
 | `items[].notes` | no | Up to 1000 characters |
+| `offers` | one of `items` / `offers` | Up to 50 bundles, see [Ordering an offer](#ordering-an-offer) |
 | `payment` | no | `{ "provider": "stripe", "provider_payment_id": "pi_123" }`, recorded in `payments` as `PENDING` |
 
 ```bash
@@ -596,13 +597,47 @@ The order flow was run against a real Postgres built from `schema.txt`: pricing 
 
 ---
 
+#### Ordering an offer
+
+A bundle is one offer plus the product (and modifiers) chosen for each rule. Every rule of the offer must be answered once, with exactly `rule.quantity` products:
+
+```json
+{
+  "branch_id": "<branchId>", "customer_name": "Jo",
+  "offers": [
+    { "offer_id": "<offerId>", "quantity": 2,
+      "rules": [
+        { "offer_rule_id": "<mainRuleId>", "items": [ { "product_id": "<productId>" } ] },
+        { "offer_rule_id": "<drinkRuleId>", "items": [ { "product_id": "<productId>", "modifier_ids": ["<modifierId>"] } ] }
+      ] }
+  ]
+}
+```
+
+The server checks that the offer is `active` and inside `starts_at` / `ends_at`, that each product belongs to its rule and is sold at the branch, and that the modifiers come from the rule's groups and respect each group's `required` / `min_selections` / `max_selections`. Otherwise 400.
+
+Pricing (see `src/offerPricing.ts`), per bundle: list value = products (branch price) + modifiers.
+
+| Type | Discount |
+|---|---|
+| `FIXED_PRICE` | products cost `price`, modifiers are charged on top |
+| `PERCENTAGE` | `percentage` % of the list value |
+| `FIXED_DISCOUNT` | `discount_amount`, never more than the list value |
+| `BUY_X_GET_Y` | not a bundle (400 if sent as one), it applies automatically, see below |
+
+Each bundle product is saved as an order item with `offer_id` / `offer_rule_id` (its `unit_price` is the list price). The discount is saved on `orders.discount` and as one `order_offers` row per bundle, and `total = subtotal - discount + delivery_fee`. The response includes `discount`.
+
+#### BUY_X_GET_Y (automatic)
+
+Nothing extra to send. Each rule of an active `BUY_X_GET_Y` offer means "buy `quantity` of the rule's products, get 1 more of them free". Matching normal `items` are counted together (modifiers ignored), and every full set earns one free unit of the cheapest matching product. E.g. a rule with `quantity` 2 and 2 matching items in the order adds 1 free unit. Free units are saved as order items named `<product> (free)` with price 0 and the `offer_id` / `offer_rule_id`, so `subtotal` and `total` do not change. Rules are evaluated independently.
+
 ## 12. Known limitations and roadmap
 
 **Not implemented yet**
 
 - Authentication / roles (the `users` table exists, `@supabase/server` is installed, nothing uses them). Likely design: Supabase Auth JWTs verified against `SUPABASE_JWKS_URL`, with admin / manager roles for write routes and per branch access for the KDS.
 - Rate limiting.
-- Applying offers when pricing an order (`order_offers` and `order_items.offer_id` are unused, `discount` is always 0).
+- Configurable `BUY_X_GET_Y` (the offer has no fields for X and Y, so Y is always 1 free unit of the same rule's products).
 - Payment verification. A `payment` on an order is only recorded as `PENDING`, nothing confirms it with Stripe or another provider.
 - Order status emails / notifications.
 - A `/deals` resource. The word "deal" in the old project maps to **offers** here.
@@ -631,5 +666,5 @@ The order flow was run against a real Postgres built from `schema.txt`: pricing 
 | `400 Business already exists` | By design, one business per deployment. Use `PUT /business/:id`. |
 | `409 Record is still referenced by other data` | You tried to delete something that orders (or other rows) still point to, e.g. a branch that has orders. |
 | `422` with a list of fields | The request body failed validation, the message names each field. |
-| Browser blocks requests (CORS) | Add the page's origin to `CORS_ORIGINS` and restart. |
+| Browser blocks requests (CORS) | Set `CORS_ORIGINS=*` for dev, or add the page's origin and restart. |
 | `./curl-tests.sh: Permission denied` | `chmod +x curl-tests.sh`, or run `bash curl-tests.sh`. |

@@ -33,6 +33,9 @@ export type BusinessRow = {
     active: boolean;
     created_at: Date;
     updated_at: Date;
+    // lat lon ALWAYS REQUIRED
+    latitude: number;
+    longitude: number;
 };
 
 export type BranchRow = {

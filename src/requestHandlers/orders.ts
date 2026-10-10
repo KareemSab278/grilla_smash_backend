@@ -19,6 +19,15 @@
     order_number is a per-branch counter, allocated under an advisory lock
         so simultaneous orders can never get the same number.
 
+    BUY_X_GET_Y offers are applied automatically to normal items: the free units are added as items priced 0
+        (see offerPricing.ts freeItems).
+
+    Offers (bundles) are sent as { offer_id, quantity, rules: [{ offer_rule_id, items: [{ product_id, modifier_ids }] }] }.
+        offerPricing.ts validates the picks against the offer and works out the discount.
+        Bundle products are saved as order items tagged with offer_id / offer_rule_id (unit_price is the list price),
+        the discount goes on orders.discount + one order_offers row per bundle,
+        and total = subtotal - discount + delivery fee.
+
     The whole create runs in one transaction.
 */
 
@@ -30,6 +39,9 @@ import type { Db } from "../db";
 import { badRequest, notFound } from "../errors";
 import { getRequiredRow, groupBy, newId, orNull, requireRow, unique } from "../helpers";
 import { parseInput } from "../middleware/validate";
+import { loadAutomaticOffers, loadOffer } from "./offers";
+import { freeItems, priceBundle } from "../offerPricing";
+import type { PricedBundle } from "../offerPricing";
 import { orderCreateSchema, orderStatusUpdateSchema } from "../schemas";
 import type { OrderCreate } from "../schemas";
 import type {
@@ -63,6 +75,7 @@ type CreateOrderResponse = {
     order_id: string;
     order_number: number;
     subtotal: number;
+    discount: number;
     total: number;
     message: string;
 };
@@ -132,6 +145,8 @@ type PricedModifier = { id: string; name: string; price: number };
 
 type PricedItem = {
     productId: string;
+    offerId: string | null;
+    offerRuleId: string | null;
     name: string;
     quantity: number;
     unitPrice: number;
@@ -207,6 +222,8 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
 
         return {
             productId: product.id,
+            offerId: null,
+            offerRuleId: null,
             name: product.name,
             quantity: item.quantity,
             unitPrice,
@@ -217,6 +234,68 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
     });
 };
 
+type PricedOrderOffers = { bundles: PricedBundle[]; items: PricedItem[] };
+
+// bundles are validated and priced from the offer stored in the database, the client only sends ids
+const priceOffers = async (db: Db, data: OrderCreate): Promise<PricedOrderOffers> => {
+    if (data.offers.length === 0) return { bundles: [], items: [] };
+
+    const productIds = unique(data.offers.flatMap(bundle => bundle.rules.flatMap(rule => rule.items.map(item => item.product_id))));
+    const [products, loadedOffers] = await Promise.all([
+        dbAll<OrderPricingProductRow>(db, QUERIES.GET.ORDER_PRICING_PRODUCTS, [data.branch_id, productIds]),
+        Promise.all(unique(data.offers.map(bundle => bundle.offer_id)).map(offerId => loadOffer(db, offerId))),
+    ]);
+
+    const productsById = new Map(products.map(product => [product.id, product]));
+    const offersById = new Map(loadedOffers.map(offer => [offer.id, offer]));
+    const now = new Date();
+
+    const bundles = data.offers.map(bundle => {
+        const offer = offersById.get(bundle.offer_id);
+        if (!offer) throw notFound(`offer ${bundle.offer_id} not found`);
+        return priceBundle(offer, bundle, productsById, now);
+    });
+
+    const items = bundles.flatMap(bundle =>
+        bundle.items.map(
+            (item): PricedItem => ({
+                productId: item.productId,
+                offerId: bundle.offerId,
+                offerRuleId: item.ruleId,
+                name: item.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                total: item.total,
+                notes: null,
+                modifiers: item.modifiers,
+            })
+        )
+    );
+
+    return { bundles, items };
+};
+
+// BUY_X_GET_Y: the free units earned by the normal items are added as items priced 0
+const priceFreeItems = async (db: Db, items: readonly PricedItem[]): Promise<PricedItem[]> => {
+    if (items.length === 0) return [];
+
+    const offers = await loadAutomaticOffers(db);
+
+    return freeItems(offers, items, new Date()).map(
+        (free): PricedItem => ({
+            productId: free.productId,
+            offerId: free.offerId,
+            offerRuleId: free.ruleId,
+            name: `${free.name} (free)`,
+            quantity: free.quantity,
+            unitPrice: 0,
+            total: 0,
+            notes: null,
+            modifiers: [],
+        })
+    );
+};
+
 const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]): Promise<void> => {
     for (const item of items) {
         const itemId = newId();
@@ -225,6 +304,8 @@ const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]
             itemId,
             orderId,
             item.productId,
+            item.offerId,
+            item.offerRuleId,
             item.name,
             item.quantity,
             item.unitPrice,
@@ -246,11 +327,17 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
     const created = await transaction(async tx => {
         await assertBranchExists(tx, data.branch_id);
 
-        const items = await priceItems(tx, data);
+        const [productItems, offers] = await Promise.all([
+            data.items.length > 0 ? priceItems(tx, data) : [],
+            priceOffers(tx, data),
+        ]);
+        const freeProductItems = await priceFreeItems(tx, productItems);
+        const items = [...productItems, ...freeProductItems, ...offers.items];
 
         const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+        const discount = offers.bundles.reduce((sum, bundle) => sum + bundle.discount, 0);
         const deliveryFee = data.order_type === "DELIVERY" ? data.delivery_fee : 0;
-        const total = subtotal + deliveryFee;
+        const total = subtotal - discount + deliveryFee;
 
         // lock so two simultaneous orders on one branch can never receive the same number
         await dbRun(tx, QUERIES.POST.LOCK_BRANCH_ORDERS, [data.branch_id]);
@@ -274,7 +361,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
                 orNull(data.postcode),
                 subtotal,
                 deliveryFee,
-                0,
+                discount,
                 total,
                 orNull(data.notes),
             ]),
@@ -282,6 +369,10 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
         );
 
         await insertItems(tx, order.id, items);
+
+        for (const bundle of offers.bundles) {
+            await dbRun(tx, QUERIES.POST.ORDER_OFFER, [newId(), order.id, bundle.offerId, bundle.offerName, bundle.discount]);
+        }
 
         if (data.payment) {
             await dbRun(tx, QUERIES.POST.PAYMENT, [
@@ -300,6 +391,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
         order_id: created.id,
         order_number: created.order_number,
         subtotal: created.subtotal,
+        discount: created.discount,
         total: created.total,
         message: "Order created successfully",
     });

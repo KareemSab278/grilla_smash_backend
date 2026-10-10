@@ -339,6 +339,14 @@ WHERE ($1::text IS NULL OR r.offer_id = $1)
 ORDER BY m.sort_order, m.name;
 `;
 
+const getActiveModifiersByGroupsQuery: string = `
+SELECT *
+FROM modifiers
+WHERE active
+  AND modifier_group_id = ANY($1::text[])
+ORDER BY sort_order, name;
+`;
+
 const createOfferQuery: string = `
 INSERT INTO offers (
     id,
@@ -508,8 +516,13 @@ RETURNING *;
 `;
 
 const createOrderItemQuery: string = `
-INSERT INTO order_items (id, order_id, product_id, name, quantity, unit_price, total, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO order_items (id, order_id, product_id, offer_id, offer_rule_id, name, quantity, unit_price, total, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+`;
+
+const createOrderOfferQuery: string = `
+INSERT INTO order_offers (id, order_id, offer_id, name, discount)
+VALUES ($1, $2, $3, $4, $5);
 `;
 
 const createOrderItemModifierQuery: string = `
@@ -561,6 +574,7 @@ export const QUERIES = {
         OFFER_RULE_PRODUCTS: getOfferRuleProductsQuery,
         OFFER_RULE_GROUPS: getOfferRuleGroupsQuery,
         OFFER_RULE_MODIFIERS: getOfferRuleModifiersQuery,
+        ACTIVE_MODIFIERS_BY_GROUPS: getActiveModifiersByGroupsQuery,
 
         NEXT_ORDER_NUMBER: getNextOrderNumberQuery,
         ACTIVE_ORDERS: getActiveOrdersQuery,
@@ -588,6 +602,7 @@ export const QUERIES = {
         LOCK_BRANCH_ORDERS: lockBranchOrdersQuery,
         ORDER: createOrderQuery,
         ORDER_ITEM: createOrderItemQuery,
+        ORDER_OFFER: createOrderOfferQuery,
         ORDER_ITEM_MODIFIER: createOrderItemModifierQuery,
         PAYMENT: createPaymentQuery,
     },
