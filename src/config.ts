@@ -31,6 +31,7 @@ type Config = {
     readonly databaseUrl: string;
     readonly dbPoolMax: number;
     readonly corsOrigins: string[] | true;
+    readonly branchSettingsAuthEnabled: boolean;
 };
 
 const parseInteger = (name: string, raw: string | undefined, fallback: number, min: number, max: number): number => {
@@ -54,7 +55,7 @@ const getDatabaseUrl = (): string => {
 };
 
 const parseCorsOrigins = (raw: string | undefined): string[] | true => {
-    if (raw === undefined || raw.trim() === "") return DEFAULT_CORS_ORIGINS;
+    if (raw === undefined || raw.trim() === "") return DEFAULT_CORS_ORIGINS as string[];
     if (raw.trim() === "*") return true;
 
     return raw
@@ -63,10 +64,21 @@ const parseCorsOrigins = (raw: string | undefined): string[] | true => {
         .filter(origin => origin !== "");
 };
 
+const parseBoolean = (raw: string | undefined, fallback: boolean): boolean => {
+    if (raw === undefined || raw.trim() === "") return fallback;
+
+    const value = raw.trim().toLowerCase();
+    if (value === "true" || value === "1" || value === "yes" || value === "on") return true;
+    if (value === "false" || value === "0" || value === "no" || value === "off") return false;
+
+    throw new Error(`Invalid boolean: ${raw}`);
+};
+
 export const CONFIG: Config = {
     port: parseInteger("PORT", process.env.PORT, DEFAULT_PORT, 0, 65535),
     host: process.env.HOST || DEFAULT_HOST,
     databaseUrl: getDatabaseUrl(),
     dbPoolMax: parseInteger("DB_POOL_MAX", process.env.DB_POOL_MAX, DEFAULT_DB_POOL_MAX, 1, 100),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
+    branchSettingsAuthEnabled: parseBoolean(process.env.BRANCH_SETTINGS_AUTH_ENABLED, false),
 };

@@ -12,6 +12,7 @@ import { QUERIES } from "../queries";
 import sql, { dbAll, dbGet, dbRun, transaction } from "../db";
 import { getRequiredRow, orNull, requireRow } from "../helpers";
 import { parseInput } from "../middleware/validate";
+import { requireBranchManager } from "../middleware/requireBranchManager";
 import { branchProductOverrideSchema } from "../schemas";
 import type { BranchProductOverrideRow, BranchProductResponse, BranchRow, ProductRow, SuccessResponse } from "../types";
 
@@ -53,6 +54,7 @@ const setBranchProductOverride = async (
     req: Request<BranchProductParams>,
     res: Response<BranchProductOverrideRow>
 ): Promise<void> => {
+    await requireBranchManager(req);
     const { branchId, productId } = req.params;
     const data = parseInput(branchProductOverrideSchema, req.body);
 
@@ -77,6 +79,7 @@ const deleteBranchProductOverride = async (
     req: Request<BranchProductParams>,
     res: Response<SuccessResponse>
 ): Promise<void> => {
+    await requireBranchManager(req);
     const { branchId, productId } = req.params;
 
     await dbRun(sql, QUERIES.DELETE.BRANCH_PRODUCT_OVERRIDE, [branchId, productId]);

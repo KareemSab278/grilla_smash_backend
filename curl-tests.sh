@@ -6,12 +6,18 @@ set -euo pipefail
 #
 #   ./curl-tests.sh                                     against http://127.0.0.1:8000
 #   BASE_URL=https://your-host ./curl-tests.sh          against another server
+#   AUTH_USER_ID=<active admin-or-manager user id> ./curl-tests.sh   to exercise branch writes
 #
 # Needs: the backend running, curl, python3. It creates real rows, and only one business is allowed,
 # so a second run against the same database stops at TEST 02 ("Business already exists").
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
 JSON="Content-Type: application/json"
+AUTH_USER_ID="${AUTH_USER_ID:-}"
+AUTH_HEADER=()
+if [[ -n "$AUTH_USER_ID" ]]; then
+  AUTH_HEADER=(-H "Authorization: Bearer $AUTH_USER_ID")
+fi
 
 extract_id() {
   python3 -c 'import json, sys; data=json.load(sys.stdin); print(data.get("id") or data.get("order_id"))'
@@ -57,7 +63,8 @@ section "TEST 03 - BRANCHES"
 branch_id="$(
   curl -sS -X POST "$BASE_URL/branches" \
     -H "$JSON" \
-    -d '{
+      "${AUTH_HEADER[@]}" \
+      -d '{
       "name": "Main Branch",
       "address_line1": "1 High Street",
       "address_line2": null,
@@ -74,6 +81,7 @@ curl -sS -X GET "$BASE_URL/branches/$branch_id"
 echo
 curl -sS -X PUT "$BASE_URL/branches/$branch_id" \
   -H "$JSON" \
+  "${AUTH_HEADER[@]}" \
   -d '{
     "name": "Main Branch Updated",
     "active": false
@@ -195,6 +203,7 @@ curl -sS -X GET "$BASE_URL/branches/$branch_id/products"
 echo
 curl -sS -X PUT "$BASE_URL/branches/$branch_id/products/$product_id" \
   -H "$JSON" \
+  "${AUTH_HEADER[@]}" \
   -d '{
     "active": true,
     "price_override": 799
@@ -202,7 +211,7 @@ curl -sS -X PUT "$BASE_URL/branches/$branch_id/products/$product_id" \
 echo
 curl -sS -X GET "$BASE_URL/branches/$branch_id/products"
 echo
-curl -sS -X DELETE "$BASE_URL/branches/$branch_id/products/$product_id"
+curl -sS -X DELETE "$BASE_URL/branches/$branch_id/products/$product_id" "${AUTH_HEADER[@]}"
 echo
 
 section "TEST 10 - OFFERS"

@@ -185,7 +185,7 @@ export const priceBundle = (
             if (!product || !rule.products.some(allowed => allowed.id === pick.product_id)) {
                 throw badRequest(`Product ${pick.product_id} is not part of '${rule.name}' in '${offer.name}'`);
             }
-            if (!product.active || product.branch_active === false) {
+            if (!product.active || product.branch_active === false || product.branch_unavailable) {
                 throw badRequest(`'${product.name}' is not available at this branch`);
             }
 

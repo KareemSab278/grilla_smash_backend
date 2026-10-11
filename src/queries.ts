@@ -16,6 +16,7 @@
 // ========================================
 
 const getBusinessQuery: string = `SELECT * FROM business LIMIT 1;`;
+const getUserByIdQuery: string = `SELECT * FROM users WHERE id = $1;`;
 
 const getBusinessByIdQuery: string = `SELECT * FROM business WHERE id = $1;`;
 
@@ -57,9 +58,23 @@ INSERT INTO branches (
     postcode,
     phone,
     latitude,
-    longitude
+    longitude,
+    opening_hours,
+    unavailable_products
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    COALESCE($10::jsonb, '{"monday":{"open":"09:00","close":"17:00","is_closed":false},"tuesday":{"open":"09:00","close":"17:00","is_closed":false},"wednesday":{"open":"09:00","close":"17:00","is_closed":false},"thursday":{"open":"09:00","close":"17:00","is_closed":false},"friday":{"open":"09:00","close":"17:00","is_closed":false},"saturday":{"open":"09:00","close":"17:00","is_closed":false},"sunday":{"open":"09:00","close":"17:00","is_closed":false}}'::jsonb),
+    '{}'::text[]
+)
 RETURNING *;
 `;
 
@@ -80,6 +95,30 @@ RETURNING *;
 `;
 
 const deleteBranchQuery: string = `DELETE FROM branches WHERE id = $1 RETURNING id;`;
+
+const updateBranchOpeningHoursQuery: string = `
+UPDATE branches
+SET opening_hours = $2
+WHERE id = $1
+RETURNING *;
+`;
+
+const addBranchUnavailableProductQuery: string = `
+UPDATE branches
+SET unavailable_products = CASE
+    WHEN $2 = ANY(unavailable_products) THEN unavailable_products
+    ELSE array_append(unavailable_products, $2)
+END
+WHERE id = $1
+RETURNING *;
+`;
+
+const removeBranchUnavailableProductQuery: string = `
+UPDATE branches
+SET unavailable_products = array_remove(unavailable_products, $2)
+WHERE id = $1
+RETURNING *;
+`;
 
 // ========================================
 // CATEGORIES
@@ -263,11 +302,14 @@ SELECT
     bpo.active AS branch_active,
     bpo.price_override
 FROM products p
+JOIN branches b
+    ON b.id = $1
 LEFT JOIN branch_product_overrides bpo
     ON bpo.product_id = p.id
     AND bpo.branch_id = $1
 WHERE p.active
   AND (bpo.active IS NULL OR bpo.active)
+  AND NOT (p.id = ANY(b.unavailable_products))
 ORDER BY p.sort_order, p.name;
 `;
 
@@ -455,8 +497,11 @@ SELECT
     p.active,
     p.price,
     bpo.active AS branch_active,
-    bpo.price_override
+    bpo.price_override,
+    COALESCE(b.unavailable_products, '{}'::text[]) @> ARRAY[p.id] AS branch_unavailable
 FROM products p
+JOIN branches b
+    ON b.id = $1
 LEFT JOIN branch_product_overrides bpo
     ON bpo.product_id = p.id
     AND bpo.branch_id = $1
@@ -545,6 +590,7 @@ RETURNING id, status;
 export const QUERIES = {
     GET: {
         BUSINESS: getBusinessQuery,
+        USER_BY_ID: getUserByIdQuery,
         BUSINESS_BY_ID: getBusinessByIdQuery,
         BUSINESS_ID: getBusinessIdQuery,
 
@@ -610,6 +656,8 @@ export const QUERIES = {
     PUT: {
         BUSINESS: updateBusinessQuery,
         BRANCH: updateBranchQuery,
+        BRANCH_OPENING_HOURS: updateBranchOpeningHoursQuery,
+        BRANCH_UNAVAILABLE_PRODUCT: addBranchUnavailableProductQuery,
         CATEGORY: updateCategoryQuery,
         PRODUCT: updateProductQuery,
         MODIFIER_GROUP: updateModifierGroupQuery,
@@ -620,11 +668,13 @@ export const QUERIES = {
     },
 
     PATCH: {
+        BRANCH_OPENING_HOURS: updateBranchOpeningHoursQuery,
         ORDER_STATUS: updateOrderStatusQuery,
     },
 
     DELETE: {
         BRANCH: deleteBranchQuery,
+        BRANCH_UNAVAILABLE_PRODUCT: removeBranchUnavailableProductQuery,
         CATEGORY: deleteCategoryQuery,
         PRODUCT: deleteProductQuery,
         PRODUCT_CATEGORIES: unlinkProductCategoriesQuery,

@@ -21,9 +21,10 @@ A generic online-ordering API (menu, branches, offers, orders) written in strict
    - [8.7 Modifier groups](#87-modifier-groups)
    - [8.8 Modifiers](#88-modifiers)
    - [8.9 Product modifier groups](#89-product-modifier-groups)
-   - [8.10 Branch product overrides](#810-branch-product-overrides)
-   - [8.11 Offers](#811-offers)
-   - [8.12 Orders](#812-orders)
+   - [8.10 Branch hours and availability](#810-branch-hours-and-availability)
+   - [8.11 Branch product overrides](#811-branch-product-overrides)
+   - [8.12 Offers](#812-offers)
+   - [8.13 Orders](#813-orders)
 9. [Testing](#9-testing)
 10. [Adding a new endpoint](#10-adding-a-new-endpoint)
 11. [Security notes](#11-security-notes)
@@ -60,6 +61,7 @@ Money is always an **integer in pence** (`£8.99` is `899`). Ids are 12 characte
 
 1. Open Supabase, go to **SQL Editor**.
 2. Paste the whole of [`schema.txt`](./schema.txt) and run it. It is safe to run again, everything is `IF NOT EXISTS` / `OR REPLACE`.
+3. If you already have an older deployment, also run [`migrations/20261011_branch_hours_and_availability.sql`](./migrations/20261011_branch_hours_and_availability.sql) to add the new branch columns in place.
 
 ### 2.3 Configure
 
@@ -71,6 +73,7 @@ HOST=127.0.0.1
 SUPABASE_DB_URL=postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres
 DB_POOL_MAX=10
 CORS_ORIGINS=*
+BRANCH_SETTINGS_AUTH_ENABLED=false
 ```
 
 Take the connection string from **Supabase > Project Settings > Database > Connection string** (use *Session pooler*). If it does not connect, see [Troubleshooting](#13-troubleshooting).
@@ -111,6 +114,7 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `HOST` | no | `127.0.0.1` | Interface to bind. Use `0.0.0.0` in a container. |
 | `DB_POOL_MAX` | no | `10` | Max pooled connections, integer 1 to 100. |
 | `CORS_ORIGINS` | no | `127.0.0.1` / `localhost` on ports 3000 and 3001 | Comma separated list of allowed browser origins, or `*` to allow any browser origin in dev. |
+| `BRANCH_SETTINGS_AUTH_ENABLED` | no | `false` | Turn branch-setting auth on when you have users/roles wired in. Leave it off for local development. |
 
 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but **the backend does not use them yet**. They are for Supabase Auth, which is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 
@@ -136,6 +140,7 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 ```
 Backend/
 ├── schema.txt                  Postgres schema, run once in the Supabase SQL editor
+├── migrations/                 additive SQL migrations for existing deployments
 ├── curl-tests.sh               end to end endpoint smoke test
 ├── package.json / tsconfig.json
 ├── test/
@@ -269,7 +274,7 @@ Base URL: `http://127.0.0.1:8000` (no prefix). All bodies are JSON, send `Conten
 - Deletes return `{ "success": true, "deleted": "<id>" }`.
 - Unknown body fields are ignored.
 - "Partial update" means only send what you want to change.
-- All routes are currently public, see [Security notes](#11-security-notes).
+- Most routes are still public, but branch-setting writes now require an active `ADMIN` or `MANAGER` user; see [Security notes](#11-security-notes).
 
 Error example:
 
@@ -309,9 +314,28 @@ curl -X POST localhost:8000/business -H 'Content-Type: application/json' \
 | GET | `/branches/:branchId` | One branch |
 | POST | `/branches` | Create |
 | PUT | `/branches/:branchId` | Partial update |
+| PATCH | `/branches/:branchId/opening-hours` | Partial weekly schedule update |
+| PUT | `/branches/:branchId/unavailable-products/:productId` | Mark a product unavailable at one branch |
+| DELETE | `/branches/:branchId/unavailable-products/:productId` | Restore product availability at one branch |
 | DELETE | `/branches/:branchId` | Delete. 409 if the branch has orders |
 
-Body fields: `name`\*, `address_line1`\*, `city`\*, `postcode`\*, `address_line2`, `phone`, `latitude` (-90 to 90), `longitude` (-180 to 180). Update also takes `active`.
+Body fields: `name`\*, `address_line1`\*, `city`\*, `postcode`\*, `address_line2`, `phone`, `latitude` (-90 to 90), `longitude` (-180 to 180). Create also accepts `opening_hours`; omit it to use the default 09:00-17:00 schedule for every day. Update also takes `active`.
+
+`opening_hours` is stored as JSON and returned on every branch response:
+
+```json
+{
+  "monday": { "open": "09:00", "close": "17:00", "is_closed": false },
+  "tuesday": { "open": "09:00", "close": "17:00", "is_closed": false },
+  "wednesday": { "open": "09:00", "close": "17:00", "is_closed": false },
+  "thursday": { "open": "09:00", "close": "17:00", "is_closed": false },
+  "friday": { "open": "09:00", "close": "17:00", "is_closed": false },
+  "saturday": { "open": "09:00", "close": "17:00", "is_closed": false },
+  "sunday": { "open": "09:00", "close": "17:00", "is_closed": false }
+}
+```
+
+PATCH `/branches/:branchId/opening-hours` accepts only the days you want to change. For example, sending only `monday` updates Monday and leaves the other six days unchanged. A closed day can be represented with `{ "is_closed": true }`.
 
 ### 8.5 Categories
 
@@ -390,7 +414,11 @@ Which groups a product offers. **Orders are validated against these links.**
 
 Attach body: `{ "modifier_group_id": "<id>", "sort_order": 0 }`.
 
-### 8.10 Branch product overrides
+### 8.10 Branch hours and availability
+
+The branch row now includes both `opening_hours` and `unavailable_products`. `unavailable_products` is a simple `text[]` list of product ids that are hidden from that branch's customer menu and rejected again when an order is created.
+
+### 8.11 Branch product overrides
 
 Lets a branch hide a product or charge a different price. `null` means "use the normal value".
 
@@ -402,7 +430,13 @@ Lets a branch hide a product or charge a different price. `null` means "use the 
 
 PUT body: `{ "active": false }` and/or `{ "price_override": 799 }`. A product with `active: false` is hidden from that branch and cannot be ordered there.
 
-### 8.11 Offers
+Branch availability now also honours `branches.unavailable_products`:
+
+- `GET /branches/:branchId/products` filters those ids out of the customer menu.
+- `POST /orders` rejects them again, even if someone submits the ids directly.
+- Managers can toggle them with the branch routes above.
+
+### 8.12 Offers
 
 An offer is a configurable bundle or discount. It has **rules** (slots such as "Main", "Side", "Drink"), each rule lists allowed products and optionally modifier groups with their own min / max.
 
@@ -435,7 +469,7 @@ Validated before anything is written, otherwise 400 / 404: products, groups and 
 
 > Offers are applied when an order is created, see [Ordering an offer](#ordering-an-offer). A rule modifier group with no `modifier_ids` lists every active modifier of the group in responses.
 
-### 8.12 Orders
+### 8.13 Orders
 
 | Method | Path | Description |
 |---|---|---|
@@ -563,6 +597,8 @@ BASE_URL=http://host:8000 ./curl-tests.sh    # against another server
 
 It walks every endpoint in dependency order (business, branch, category, product, modifier group, modifier, link, override, offer, order) and reuses the ids each `POST` returns, so nothing needs editing by hand. Needs `curl` and `python3`.
 
+If you want the branch-write steps in the script to succeed, also set `AUTH_USER_ID` to the id of an active `ADMIN` or `MANAGER` row and the script will send the matching `Authorization: Bearer ...` header.
+
 It writes real data, and because only one business may exist, running it twice against the same database stops at `TEST 02` with `Business already exists`. Use a scratch database or clear the tables first.
 
 ### 9.3 What has been verified against a real Postgres
@@ -586,7 +622,7 @@ The order flow was run against a real Postgres built from `schema.txt`: pricing 
 
 ## 11. Security notes
 
-- **There is no authentication or authorization yet.** Every route, including admin writes (`POST /products`, `DELETE /branches/...`) and order lists that contain customer names, emails, phone numbers and addresses, is open to anyone who can reach the server. Do not expose this to the internet as it is. Adding auth is the first roadmap item.
+- Branch-setting writes now require an active `ADMIN` or `MANAGER` user. The backend currently accepts `Authorization: Bearer <user-id>` where the user id comes from the `users` table; this is a stopgap until full Supabase Auth is wired in.
 - There is **no rate limiting** yet.
 - SQL injection is not possible: all SQL is static and parameterised.
 - Prices on orders are computed server side, the client cannot set them.
@@ -635,7 +671,7 @@ Nothing extra to send. Each rule of an active `BUY_X_GET_Y` offer means "buy `qu
 
 **Not implemented yet**
 
-- Authentication / roles (the `users` table exists, `@supabase/server` is installed, nothing uses them). Likely design: Supabase Auth JWTs verified against `SUPABASE_JWKS_URL`, with admin / manager roles for write routes and per branch access for the KDS.
+- Full authentication / roles. The branch-setting routes have a temporary id-based Bearer token gate, but the intended design is still Supabase Auth JWTs verified against `SUPABASE_JWKS_URL`, with admin / manager roles for write routes and per branch access for the KDS.
 - Rate limiting.
 - Configurable `BUY_X_GET_Y` (the offer has no fields for X and Y, so Y is always 1 free unit of the same rule's products).
 - Payment verification. A `payment` on an order is only recorded as `PENDING`, nothing confirms it with Stripe or another provider.

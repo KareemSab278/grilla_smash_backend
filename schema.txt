@@ -22,6 +22,8 @@ CREATE TABLE public.branches (
   phone text,
   latitude double precision CHECK (latitude IS NULL OR latitude >= '-90'::integer::double precision AND latitude <= 90::double precision),
   longitude double precision CHECK (longitude IS NULL OR longitude >= '-180'::integer::double precision AND longitude <= 180::double precision),
+  opening_hours jsonb NOT NULL DEFAULT '{"monday":{"open":"09:00","close":"17:00","is_closed":false},"tuesday":{"open":"09:00","close":"17:00","is_closed":false},"wednesday":{"open":"09:00","close":"17:00","is_closed":false},"thursday":{"open":"09:00","close":"17:00","is_closed":false},"friday":{"open":"09:00","close":"17:00","is_closed":false},"saturday":{"open":"09:00","close":"17:00","is_closed":false},"sunday":{"open":"09:00","close":"17:00","is_closed":false}}'::jsonb,
+  unavailable_products text[] NOT NULL DEFAULT '{}'::text[],
   active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),

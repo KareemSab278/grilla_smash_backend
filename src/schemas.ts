@@ -23,6 +23,9 @@ const optionalText = z.string().nullish();
 const pence = z.int().min(0);
 const sortOrder = z.int();
 const id = z.string().min(1);
+const timeHHMM = z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid time");
 
 // accepts anything Date can parse, e.g. "2026-01-31T18:30" from the admin datetime-local inputs
 const dateTime = z
@@ -56,6 +59,42 @@ export const businessUpdateSchema = z.object({
 // BRANCHES
 // ========================================
 
+const dayHoursSchema = z
+    .object({
+        open: timeHHMM,
+        close: timeHHMM,
+        is_closed: z.boolean().default(false),
+    })
+    .refine(value => value.is_closed || value.open < value.close, "open must be before close");
+
+const dayHoursPatchSchema = z.object({
+    open: timeHHMM.optional(),
+    close: timeHHMM.optional(),
+    is_closed: z.boolean().optional(),
+});
+
+export const openingHoursSchema = z.object({
+    monday: dayHoursSchema,
+    tuesday: dayHoursSchema,
+    wednesday: dayHoursSchema,
+    thursday: dayHoursSchema,
+    friday: dayHoursSchema,
+    saturday: dayHoursSchema,
+    sunday: dayHoursSchema,
+});
+
+export const openingHoursPatchSchema = z
+    .object({
+        monday: dayHoursPatchSchema.optional(),
+        tuesday: dayHoursPatchSchema.optional(),
+        wednesday: dayHoursPatchSchema.optional(),
+        thursday: dayHoursPatchSchema.optional(),
+        friday: dayHoursPatchSchema.optional(),
+        saturday: dayHoursPatchSchema.optional(),
+        sunday: dayHoursPatchSchema.optional(),
+    })
+    .partial();
+
 export const branchCreateSchema = z.object({
     name,
     address_line1: name,
@@ -65,6 +104,7 @@ export const branchCreateSchema = z.object({
     phone: optionalText,
     latitude: z.number().min(-90).max(90).nullish(),
     longitude: z.number().min(-180).max(180).nullish(),
+    opening_hours: openingHoursSchema.nullish(),
 });
 
 export const branchUpdateSchema = z.object({
@@ -304,6 +344,8 @@ export type BusinessCreate = z.infer<typeof businessCreateSchema>;
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
 export type BranchCreate = z.infer<typeof branchCreateSchema>;
 export type BranchUpdate = z.infer<typeof branchUpdateSchema>;
+export type OpeningHoursInput = z.infer<typeof openingHoursSchema>;
+export type OpeningHoursPatch = z.infer<typeof openingHoursPatchSchema>;
 export type CategoryCreate = z.infer<typeof categoryCreateSchema>;
 export type CategoryUpdate = z.infer<typeof categoryUpdateSchema>;
 export type ProductCreate = z.infer<typeof productCreateSchema>;

@@ -24,6 +24,26 @@ export type SuccessResponse = {
 // ROWS (1:1 with the tables in database/schema.sql)
 // ========================================
 
+export type DayOfWeek =
+    | "monday"
+    | "tuesday"
+    | "wednesday"
+    | "thursday"
+    | "friday"
+    | "saturday"
+    | "sunday";
+
+export type DayHours = {
+    open: string; // e.g., "09:00"
+    close: string; // e.g., "17:00"
+    is_closed?: boolean;
+};
+
+export type OpeningHours = {
+    [day in DayOfWeek]: DayHours;
+};
+
+
 export type BusinessRow = {
     id: string;
     name: string;
@@ -33,9 +53,6 @@ export type BusinessRow = {
     active: boolean;
     created_at: Date;
     updated_at: Date;
-    // lat lon ALWAYS REQUIRED
-    latitude: number;
-    longitude: number;
 };
 
 export type BranchRow = {
@@ -51,6 +68,8 @@ export type BranchRow = {
     active: boolean;
     created_at: Date;
     updated_at: Date;
+    opening_hours: OpeningHours;
+    unavailable_products: string[];
 };
 
 export type CategoryRow = {
@@ -191,8 +210,8 @@ export type AttachModifierGroupResponse = {
 
 export type OrderType = "PICKUP" | "DELIVERY";
 
-export type OrderStatus =   "PENDING" | "ACCEPTED" | "PREPARING" |
-                            "READY" | "COMPLETED" | "CANCELLED" | "REFUNDED";
+export type OrderStatus = "PENDING" | "ACCEPTED" | "PREPARING" |
+    "READY" | "COMPLETED" | "CANCELLED" | "REFUNDED";
 
 export type OrderRow = {
     id: string;
@@ -263,6 +282,17 @@ export type OrderPricingProductRow = {
     price: number;
     branch_active: boolean | null;
     price_override: number | null;
+    branch_unavailable: boolean;
+};
+
+export type UserRow = {
+    id: string;
+    username: string;
+    password_hash: string;
+    role: "ADMIN" | "MANAGER";
+    active: boolean;
+    created_at: Date;
+    updated_at: Date;
 };
 
 export type OrderPricingGroupRow = {

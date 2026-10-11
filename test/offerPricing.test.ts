@@ -19,6 +19,7 @@ const product = (id: string, price: number, extra: Partial<OrderPricingProductRo
     price,
     branch_active: null,
     price_override: null,
+    branch_unavailable: false,
     ...extra,
 });
 
