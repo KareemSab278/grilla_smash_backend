@@ -94,12 +94,27 @@ test("orderCreateSchema applies defaults and strips client supplied prices", () 
         ...validOrder,
         total: 1,
         items: [{ product_id: "p1", quantity: 2, price: 1 }],
+        payment: { provider: "stripe", provider_payment_id: "pi_test_123" },
     });
 
     assert.equal(parsed.order_type, "PICKUP");
     assert.equal(parsed.delivery_fee, 0);
     assert.deepEqual(parsed.items, [{ product_id: "p1", quantity: 2, modifier_ids: [] }]);
+    assert.deepEqual(parsed.payment, { provider: "stripe", payment_reference: "pi_test_123" });
     assert.equal("total" in parsed, false);
+});
+
+test("orderCreateSchema prefers payment_reference when both payment keys are sent", () => {
+    const parsed = orderCreateSchema.parse({
+        ...validOrder,
+        payment: {
+            provider: "stripe",
+            payment_reference: "pi_ref_123",
+            provider_payment_id: "pi_old_123",
+        },
+    });
+
+    assert.deepEqual(parsed.payment, { provider: "stripe", payment_reference: "pi_ref_123" });
 });
 
 test("orderCreateSchema requires an address for DELIVERY only", () => {

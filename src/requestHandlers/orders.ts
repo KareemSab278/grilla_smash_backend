@@ -323,6 +323,11 @@ const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]
 
 const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Promise<void> => {
     const data = parseInput(orderCreateSchema, req.body);
+    const payRef = data.payment?.payment_reference;
+    
+    if (payRef === undefined || payRef === null || payRef.trim() === "") {
+        throw new Error("Payment reference is required when payment is provided");
+    }
 
     const created = await transaction(async tx => {
         await assertBranchExists(tx, data.branch_id);
@@ -364,6 +369,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
                 discount,
                 total,
                 orNull(data.notes),
+                orNull(data.payment?.payment_reference),
             ]),
             "order"
         );
@@ -379,7 +385,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
                 newId(),
                 order.id,
                 data.payment.provider,
-                orNull(data.payment.provider_payment_id),
+                orNull(data.payment.payment_reference),
                 total,
             ]);
         }

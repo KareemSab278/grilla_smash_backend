@@ -501,7 +501,7 @@ Body fields:
 | `items[].modifier_ids` | no | Modifier ids, each at most once |
 | `items[].notes` | no | Up to 1000 characters |
 | `offers` | one of `items` / `offers` | Up to 50 bundles, see [Ordering an offer](#ordering-an-offer) |
-| `payment` | no | `{ "provider": "stripe", "provider_payment_id": "pi_123" }`, recorded in `payments` as `PENDING` |
+| `payment` | no | `{ "provider": "stripe", "payment_reference": "pi_123" }` (or the legacy `provider_payment_id`), recorded in `payments` as `PENDING` |
 
 ```bash
 curl -X POST localhost:8000/orders -H 'Content-Type: application/json' -d '{
@@ -514,7 +514,7 @@ curl -X POST localhost:8000/orders -H 'Content-Type: application/json' -d '{
   "items": [
     { "product_id": "5dbf0d8e43d9", "quantity": 2, "modifier_ids": ["17896a2d3891"], "notes": "extra crispy" }
   ],
-  "payment": { "provider": "stripe", "provider_payment_id": "pi_123" }
+  "payment": { "provider": "stripe", "payment_reference": "pi_123" }
 }'
 ```
 
@@ -561,7 +561,7 @@ curl -X PATCH localhost:8000/orders/status -H 'Content-Type: application/json' \
     "order_type": "DELIVERY", "status": "PENDING",
     "customer_name": "Jordan", "customer_phone": null, "customer_email": "jordan@example.com",
     "address_line1": "1 Test Street", "address_line2": null, "city": "London", "postcode": "SW1A 1AA",
-    "subtotal": 1898, "delivery_fee": 250, "discount": 0, "total": 2148, "notes": null,
+    "subtotal": 1898, "delivery_fee": 250, "discount": 0, "total": 2148, "notes": null, "payment_reference": "pi_123",
     "created_at": "2026-10-08T12:00:00.000Z", "updated_at": "2026-10-08T12:00:00.000Z",
     "items": [{
       "id": "...", "order_id": "c7cea41be001", "product_id": "5dbf0d8e43d9",

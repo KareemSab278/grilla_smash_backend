@@ -169,6 +169,7 @@ CREATE TABLE public.orders (
   discount integer NOT NULL DEFAULT 0,
   total integer NOT NULL,
   notes text,
+  payment_reference text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT orders_pkey PRIMARY KEY (id),

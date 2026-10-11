@@ -231,6 +231,7 @@ export type OrderRow = {
     discount: number;
     total: number;
     notes: string | null;
+    payment_reference: string | null;
     created_at: Date;
     updated_at: Date;
 };

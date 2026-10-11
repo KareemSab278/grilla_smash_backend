@@ -305,8 +305,12 @@ const orderOfferSchema = z.object({
 
 const orderPaymentSchema = z.object({
     provider: name,
+    payment_reference: optionalShortText,
     provider_payment_id: optionalShortText,
-});
+}).transform(({ provider, payment_reference, provider_payment_id }) => ({
+    provider,
+    payment_reference: payment_reference ?? provider_payment_id ?? null,
+}));
 
 export const orderCreateSchema = z
     .object({

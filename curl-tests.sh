@@ -290,7 +290,7 @@ order_id="$(
           \"modifier_ids\": [\"$modifier_id\"]
         }
       ],
-      \"payment\": { \"provider\": \"stripe\", \"provider_payment_id\": \"pi_test_123\" }
+      \"payment\": { \"provider\": \"stripe\", \"payment_reference\": \"pi_test_123\" }
     }" | extract_id
 )"
 echo "Created order id: $order_id"
