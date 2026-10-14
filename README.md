@@ -120,8 +120,9 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `DB_POOL_MAX` | no | `10` | Max pooled connections, integer 1 to 100. |
 | `CORS_ORIGINS` | no | `127.0.0.1` / `localhost` on ports 3000 and 3001 | Comma separated list of allowed browser origins, or `*` to allow any browser origin in dev. |
 | `BRANCH_SETTINGS_AUTH_ENABLED` | no | `false` | Turn branch-setting auth on when you have users/roles wired in. Leave it off for local development. |
-| `STRIPE_SECRET_TEST_KEY` | yes | none | Stripe secret key used by the `/payments/stripe/*` routes. |
-| `SHIFT4_SECRET_KEY` | no | none | Shift4 secret key (fallback provider). Without it the Shift4 routes answer 503. |
+| `STRIPE_SECRET_TEST_KEY` | yes | none | Stripe secret key. Stripe is the default payment provider. |
+| `USE_STRIPE` | no | `true` | Set to `false` to route the payment endpoints through Shift4 instead of Stripe. |
+| `SHIFT4_SECRET_KEY` | no | none | Shift4 secret key. Required when `USE_STRIPE=false`; otherwise Shift4 is not used. |
 | `RESEND_API_KEY` | yes | none | Resend API key, used for order status emails and password reset codes. |
 | `EMAIL_FROM` | no | `test_business <grillasmash@gmail.com>` | Sender of every email. This is a testing sender for the current Resend setup; override it with your verified business address in production. |
 
@@ -634,16 +635,13 @@ curl -X POST localhost:8000/user/reset_password -H 'Content-Type: application/js
 
 ### 8.15 Payments
 
-Stripe is the main provider, Shift4 is a fallback (503 `Shift4 is not configured` without `SHIFT4_SECRET_KEY`). `amount` is normalised to pence: a number is taken as pence, a string with a `.` as pounds (`"12.50"` is 1250). Failures return `{ "success": false, "error", "error_message" }`.
+Stripe is the default provider. Set `USE_STRIPE=false` to use Shift4 instead (503 `Shift4 is not configured` without `SHIFT4_SECRET_KEY`). All three endpoints below use the selected provider. `amount` is normalised to pence: a number is taken as pence, a string with a `.` as pounds (`"12.50"` is 1250). Failures return `{ "success": false, "error", "error_message" }`.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/payments/stripe/checkout-session?amount=&currency=` | Creates a PaymentIntent, returns `{ success, clientSecret }`. `/payments/stripe-checkout-session` is an alias |
-| POST | `/payments/stripe/charge` | Body `amount`, `currency`, `paymentMethodId`. Creates and confirms a PaymentIntent |
-| POST | `/payments/stripe/checkout-callback` | Body `stripeSessionId`. Verifies a Checkout session |
-| GET | `/payments/checkout-session?amount=&currency=` | Shift4 signed checkout request, returns `{ success, clientSecret }` |
-| POST | `/payments/charge` | Shift4. Body `amount`, `currency`, and `token` or `card` |
-| POST | `/payments/checkout-callback` | Shift4. Body `shift4ChargeId`. Verifies a charge |
+| GET | `/payments/checkout-session?amount=&currency=` | Stripe creates a PaymentIntent and returns `{ success, clientSecret }`; Shift4 returns a signed checkout request |
+| POST | `/payments/charge` | Stripe body: `amount`, `currency`, `paymentMethodId`; Shift4 body: `amount`, `currency`, and `token` or `card` |
+| POST | `/payments/checkout-callback` | Stripe body: `paymentIntentId`; Shift4 body: `shift4ChargeId`. Retrieves the payment status from the selected provider |
 
 Success responses are `{ success, charge_id, amount, currency, status }` where `status` is `200` when paid and `402` when not.
 

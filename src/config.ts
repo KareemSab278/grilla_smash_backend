@@ -30,6 +30,7 @@ type Config = {
     readonly dbPoolMax: number;
     readonly corsOrigins: string[] | true;
     readonly branchSettingsAuthEnabled: boolean;
+    readonly useStripe: boolean;
     readonly stripeSecretKey: string;
     readonly shift4SecretKey: string | undefined;
     readonly resendApiKey: string;
@@ -90,6 +91,7 @@ export const CONFIG: Config = {
     dbPoolMax: parseInteger("DB_POOL_MAX", process.env.DB_POOL_MAX, DEFAULT_DB_POOL_MAX, 1, 100),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     branchSettingsAuthEnabled: parseBoolean(process.env.BRANCH_SETTINGS_AUTH_ENABLED, false),
+    useStripe: parseBoolean(process.env.USE_STRIPE, true),
     stripeSecretKey: requireEnv("STRIPE_SECRET_TEST_KEY"),
     shift4SecretKey: process.env.SHIFT4_SECRET_KEY || undefined,
     resendApiKey: requireEnv("RESEND_API_KEY"),

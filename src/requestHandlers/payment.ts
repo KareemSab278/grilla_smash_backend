@@ -7,6 +7,7 @@
 
 import express from "express";
 import type { Request, Response } from "express";
+import { CONFIG } from "../config";
 import { stripe, requireShift4 } from "../payProviders";
 import { HttpError } from "../errors";
 import { normalizeAmount, buildCheckoutRequest } from "../helpers";
@@ -15,11 +16,6 @@ const router = express.Router();
 router.post("/payments/charge", async (req, res) => await handleCharge(req, res));
 router.get("/payments/checkout-session", async (req, res) => await getCheckoutSession(req, res));
 router.post("/payments/checkout-callback", async (req, res) => await getCheckoutCallback(req, res));
-
-router.post("/payments/stripe/charge", async (req, res) => await handleStripeCharge(req, res));
-router.get("/payments/stripe/checkout-session", async (req, res) => await getStripeCheckoutSession(req, res));
-router.get("/payments/stripe-checkout-session", async (req, res) => await getStripeCheckoutSession(req, res));
-router.post("/payments/stripe/checkout-callback", async (req, res) => await getStripeCheckoutCallback(req, res));
 
 // ========================================
 
@@ -53,6 +49,12 @@ const errorResponse = (res: Response, error: string, err: unknown) => {
 // ========================================
 
 const getCheckoutCallback = async (req: Request, res: Response) => {
+    return CONFIG.useStripe
+        ? getStripeCheckoutCallback(req, res)
+        : getShift4CheckoutCallback(req, res);
+};
+
+const getShift4CheckoutCallback = async (req: Request, res: Response) => {
     try {
         const body = req.body ?? {};
         const shift4ChargeId = body.shift4ChargeId || body.chargeId || body.id || body.charge?.id;
@@ -79,7 +81,18 @@ const getCheckoutCallback = async (req: Request, res: Response) => {
 
 // ========================================
 
+// handles both stripe and shift4 depending on USE_STRIPE
 const getCheckoutSession = async (req: Request, res: Response) => {
+    try {
+        return CONFIG.useStripe
+            ? await getStripeCheckoutSession(req, res)
+            : await getShift4CheckoutSession(req, res);
+    } catch (err) {
+        return errorResponse(res, "Unable to create checkout session.", err);
+    }
+};
+
+const getShift4CheckoutSession = async (req: Request, res: Response) => {
     try {
         const { amount, currency = "GBP" } = req.query as Record<string, any>;
         const request = buildCheckoutRequest({ amount, currency });
@@ -92,9 +105,34 @@ const getCheckoutSession = async (req: Request, res: Response) => {
     }
 };
 
+
+const getStripeCheckoutSession = async (req: Request, res: Response) => {
+    try {
+        const { amount, currency = "GBP" } = req.query as Record<string, any>;
+        const normalizedAmount = normalizeAmount(amount);
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: normalizedAmount,
+            currency: currency.toUpperCase(),
+            automatic_payment_methods: { enabled: true },
+        });
+
+        return res.json({ success: true, clientSecret: paymentIntent.client_secret });
+    } catch (err) {
+        return errorResponse(res, "Unable to create Stripe checkout session.", err);
+    }
+};
+
+
 // ========================================
 
 const handleCharge = async (req: Request, res: Response) => {
+    return CONFIG.useStripe
+        ? handleStripeCharge(req, res)
+        : handleShift4Charge(req, res);
+};
+
+const handleShift4Charge = async (req: Request, res: Response) => {
     try {
         const { amount, currency, token, card, customerId } = req.body;
 
@@ -146,20 +184,21 @@ const buildChargeParams = ({ amount, currency, token, card, customerId }: Record
 const getStripeCheckoutCallback = async (req: Request, res: Response) => {
     try {
         const body = req.body ?? {};
-        const stripeSessionId = body.stripeSessionId || body.sessionId || body.id;
+        const paymentIntentId =
+            body.paymentIntentId || body.stripePaymentIntentId || body.paymentId || body.id;
 
-        if (!stripeSessionId) {
-            return res.status(400).json({ success: false, error: "Missing stripeSessionId" });
+        if (!paymentIntentId) {
+            return res.status(400).json({ success: false, error: "Missing paymentIntentId" });
         }
 
-        const session = await stripe.checkout.sessions.retrieve(stripeSessionId);
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
         const response: healthyResponse = {
             success: true,
-            charge_id: session.id,
-            amount: session.amount_total ?? undefined,
-            currency: session.currency ?? undefined,
-            status: session.payment_status === "paid" ? 200 : 402,
+            charge_id: paymentIntent.id,
+            amount: paymentIntent.amount,
+            currency: paymentIntent.currency,
+            status: paymentIntent.status === "succeeded" ? 200 : 402,
         };
 
         return res.json(response);
@@ -168,24 +207,6 @@ const getStripeCheckoutCallback = async (req: Request, res: Response) => {
     }
 };
 
-// ========================================
-
-const getStripeCheckoutSession = async (req: Request, res: Response) => {
-    try {
-        const { amount, currency = "GBP" } = req.query as Record<string, any>;
-        const normalizedAmount = normalizeAmount(amount);
-
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: normalizedAmount,
-            currency: currency.toUpperCase(),
-            automatic_payment_methods: { enabled: true },
-        });
-
-        return res.json({ success: true, clientSecret: paymentIntent.client_secret });
-    } catch (err) {
-        return errorResponse(res, "Unable to create Stripe checkout session.", err);
-    }
-};
 
 // ========================================
 
