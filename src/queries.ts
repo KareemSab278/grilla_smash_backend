@@ -15,17 +15,21 @@
 // BUSINESS
 // ========================================
 
-const getBusinessQuery: string = `SELECT * FROM business LIMIT 1;`;
-const getUserByIdQuery: string = `SELECT * FROM users WHERE id = $1;`;
+// key_hash is never part of a response, it only ever leaves the table through getBusinessKeyHashQuery
+const BUSINESS_COLUMNS = "id, name, slug, logo_url, currency, active, created_at, updated_at";
 
-const getBusinessByIdQuery: string = `SELECT * FROM business WHERE id = $1;`;
+const getBusinessQuery: string = `SELECT ${BUSINESS_COLUMNS} FROM business LIMIT 1;`;
+
+const getBusinessByIdQuery: string = `SELECT ${BUSINESS_COLUMNS} FROM business WHERE id = $1;`;
 
 const getBusinessIdQuery: string = `SELECT id FROM business LIMIT 1;`;
 
+const getBusinessKeyHashQuery: string = `SELECT key_hash FROM business LIMIT 1;`;
+
 const createBusinessQuery: string = `
-INSERT INTO business (id, name, slug, logo_url, currency)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING *;
+INSERT INTO business (id, name, slug, logo_url, currency, key_hash)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING ${BUSINESS_COLUMNS};
 `;
 
 const updateBusinessQuery: string = `
@@ -37,7 +41,32 @@ SET
     currency = COALESCE($4, currency),
     active = COALESCE($5, active)
 WHERE id = $6
-RETURNING *;
+RETURNING ${BUSINESS_COLUMNS};
+`;
+
+// ========================================
+// USERS
+// ========================================
+
+const USER_PUBLIC_COLUMNS = "id, username, email, role, active, created_at, updated_at";
+
+const getUserByIdQuery: string = `SELECT * FROM users WHERE id = $1;`;
+
+const getUserByEmailQuery: string = `SELECT * FROM users WHERE email = $1;`;
+
+const getUserByUsernameQuery: string = `SELECT * FROM users WHERE username = $1;`;
+
+const createUserQuery: string = `
+INSERT INTO users (id, username, password_hash, email, role)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING ${USER_PUBLIC_COLUMNS};
+`;
+
+const updateUserPasswordQuery: string = `
+UPDATE users
+SET password_hash = $2, updated_at = now()
+WHERE id = $1 AND active
+RETURNING id;
 `;
 
 // ========================================
@@ -537,6 +566,8 @@ WHERE m.active
   AND pmg.product_id = ANY($1::text[]);
 `;
 
+const getOrderEmailTargetQuery: string = `SELECT order_number, customer_email FROM orders WHERE id = $1;`;
+
 const createOrderQuery: string = `
 INSERT INTO orders (
     id,
@@ -592,8 +623,11 @@ export const QUERIES = {
     GET: {
         BUSINESS: getBusinessQuery,
         USER_BY_ID: getUserByIdQuery,
+        USER_BY_EMAIL: getUserByEmailQuery,
+        USER_BY_USERNAME: getUserByUsernameQuery,
         BUSINESS_BY_ID: getBusinessByIdQuery,
         BUSINESS_ID: getBusinessIdQuery,
+        BUSINESS_KEY_HASH: getBusinessKeyHashQuery,
 
         BRANCHES: getBranchesQuery,
         BRANCH_BY_ID: getBranchByIdQuery,
@@ -631,10 +665,12 @@ export const QUERIES = {
         ORDER_PRICING_PRODUCTS: getOrderPricingProductsQuery,
         ORDER_PRICING_GROUPS: getOrderPricingGroupsQuery,
         ORDER_PRICING_MODIFIERS: getOrderPricingModifiersQuery,
+        ORDER_EMAIL_TARGET: getOrderEmailTargetQuery,
     },
 
     POST: {
         BUSINESS: createBusinessQuery,
+        USER: createUserQuery,
         BRANCH: createBranchQuery,
         CATEGORY: createCategoryQuery,
         PRODUCT: createProductQuery,
@@ -656,6 +692,7 @@ export const QUERIES = {
 
     PUT: {
         BUSINESS: updateBusinessQuery,
+        USER_PASSWORD: updateUserPasswordQuery,
         BRANCH: updateBranchQuery,
         BRANCH_OPENING_HOURS: updateBranchOpeningHoursQuery,
         BRANCH_UNAVAILABLE_PRODUCT: addBranchUnavailableProductQuery,

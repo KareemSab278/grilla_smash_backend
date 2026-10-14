@@ -5,10 +5,11 @@
     nulls      orNull() maps undefined -> null so a value can be bound as a sql parameter
     lookups    getRequiredRow / requireRow / deleteById throw a 404 when the row is missing
     batching   groupBy() lets handlers load all child rows in one query and stitch them in memory (no N+1)
+    payments   normalizeAmount() / buildCheckoutRequest() turn client amounts into minor units (pence)
 */
 
 import { randomBytes } from "node:crypto";
-import { notFound } from "./errors";
+import { badRequest, notFound } from "./errors";
 import { dbGet } from "./db";
 import type { Db } from "./db";
 import type { DeleteResponse, SqlParam } from "./types";
@@ -65,3 +66,31 @@ export const findDuplicate = (values: readonly string[]): string | undefined => 
 
     return undefined;
 };
+
+// ========================================
+
+// a number is already in minor units, a string with a "." is in major units ("12.5" -> 1250)
+const toMinorUnits = (amount: string | number | undefined): number => {
+    if (amount === undefined || amount === null || amount === "") return NaN;
+    if (typeof amount === "number") return Math.round(amount);
+
+    const trimmed = String(amount).trim();
+    if (!trimmed.includes(".")) return Number(trimmed);
+
+    const [whole, fraction = ""] = trimmed.split(".");
+    return Number(`${whole}${(fraction + "00").slice(0, 2)}`);
+};
+
+export const normalizeAmount = (amount: string | number | undefined): number => {
+    const minorUnits = toMinorUnits(amount);
+    if (!Number.isFinite(minorUnits) || minorUnits <= 0) throw badRequest("Invalid amount");
+
+    return minorUnits;
+};
+
+export const buildCheckoutRequest = ({ amount, currency = "GBP" }: { amount: string | number; currency?: string }) => ({
+    charge: {
+        amount: normalizeAmount(amount),
+        currency: currency.toUpperCase(),
+    },
+});

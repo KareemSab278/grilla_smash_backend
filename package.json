@@ -18,12 +18,19 @@
   },
   "dependencies": {
     "@supabase/server": "^1.9.1",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "postgres": "^3.4.9",
+    "rate-limiter-flexible": "^11.2.2",
+    "redis": "^6.3.0",
+    "resend": "^6.32.1",
+    "shift4": "^2.2.0",
+    "stripe": "^23.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.4",

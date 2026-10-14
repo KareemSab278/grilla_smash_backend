@@ -29,6 +29,7 @@ export const requireBranchManager = async (req: Request): Promise<UserRow> => {
             id: "dev-bypass",
             username: "dev-bypass",
             password_hash: "",
+            email: null,
             role: "ADMIN",
             active: true,
             created_at: new Date(),

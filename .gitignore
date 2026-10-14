@@ -1,3 +1,6 @@
 node_modules
 dist
-.env
+.env*
+
+generate_business_key.ts
+generate_password_hash.ts

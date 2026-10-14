@@ -10,6 +10,7 @@ CREATE TABLE public.business (
   active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  key_hash text,
   CONSTRAINT business_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.branches (
@@ -229,9 +230,11 @@ CREATE TABLE public.users (
   id text NOT NULL,
   username text NOT NULL UNIQUE,
   password_hash text NOT NULL,
+  email text,
   role text NOT NULL DEFAULT 'ADMIN'::text CHECK (role = ANY (ARRAY['ADMIN'::text, 'MANAGER'::text])),
   active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+CREATE UNIQUE INDEX users_email_key ON public.users (lower(email));

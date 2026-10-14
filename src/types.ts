@@ -55,6 +55,9 @@ export type BusinessRow = {
     updated_at: Date;
 };
 
+// business_key is the raw key, only ever returned by the create call
+export type CreateBusinessResponse = BusinessRow & { business_key: string };
+
 export type BranchRow = {
     id: string;
     name: string;
@@ -290,11 +293,15 @@ export type UserRow = {
     id: string;
     username: string;
     password_hash: string;
+    email: string | null;
     role: "ADMIN" | "MANAGER";
     active: boolean;
     created_at: Date;
     updated_at: Date;
 };
+
+// a user as returned by the API, never includes password_hash
+export type PublicUser = Omit<UserRow, "password_hash">;
 
 export type OrderPricingGroupRow = {
     product_id: string;

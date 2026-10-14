@@ -3,18 +3,21 @@
 
     GET  /business              the business, or null when it has not been created yet
     POST /business              create it (400 if one already exists, also enforced by a unique index)
+                                the response carries the generated business_key ONCE, only its sha256 hash is stored
     PUT  /business/:businessId  partial update
 */
 
+import { randomBytes } from "node:crypto";
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";
 import sql, { dbGet, transaction } from "../db";
 import { badRequest } from "../errors";
 import { newId, orNull, requireRow } from "../helpers";
+import { hashKey } from "../keys";
 import { parseInput } from "../middleware/validate";
 import { businessCreateSchema, businessUpdateSchema } from "../schemas";
-import type { BusinessRow } from "../types";
+import type { BusinessRow, CreateBusinessResponse } from "../types";
 
 const router = express.Router();
 
@@ -33,8 +36,9 @@ const getBusiness = async (_req: Request, res: Response<BusinessRow | null>): Pr
 // ========================================
 
 // one business per deployment (also enforced by a unique index, so concurrent creates cannot slip through)
-const createBusiness = async (req: Request, res: Response<BusinessRow>): Promise<void> => {
+const createBusiness = async (req: Request, res: Response<CreateBusinessResponse>): Promise<void> => {
     const data = parseInput(businessCreateSchema, req.body);
+    const businessKey = randomBytes(32).toString("hex");
 
     const business = await transaction(async tx => {
         if (await dbGet(tx, QUERIES.GET.BUSINESS_ID)) throw badRequest("Business already exists");
@@ -45,12 +49,13 @@ const createBusiness = async (req: Request, res: Response<BusinessRow>): Promise
             data.slug,
             orNull(data.logo_url),
             data.currency,
+            hashKey(businessKey),
         ]);
 
         return requireRow(created, "business");
     });
 
-    res.json(business);
+    res.json({ ...business, business_key: businessKey });
 };
 
 // ========================================

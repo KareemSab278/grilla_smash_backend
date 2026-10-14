@@ -25,6 +25,8 @@ A generic online-ordering API (menu, branches, offers, orders) written in strict
    - [8.11 Branch product overrides](#811-branch-product-overrides)
    - [8.12 Offers](#812-offers)
    - [8.13 Orders](#813-orders)
+   - [8.14 Users and password reset](#814-users-and-password-reset)
+   - [8.15 Payments](#815-payments)
 9. [Testing](#9-testing)
 10. [Adding a new endpoint](#10-adding-a-new-endpoint)
 11. [Security notes](#11-security-notes)
@@ -62,6 +64,7 @@ Money is always an **integer in pence** (`£8.99` is `899`). Ids are 12 characte
 1. Open Supabase, go to **SQL Editor**.
 2. Paste the whole of [`schema.txt`](./schema.txt) and run it. It is safe to run again, everything is `IF NOT EXISTS` / `OR REPLACE`.
 3. If you already have an older deployment, also run [`migrations/20261011_branch_hours_and_availability.sql`](./migrations/20261011_branch_hours_and_availability.sql) to add the new branch columns in place.
+4. Also run [`migrations/20261013_user_email_and_business_key.sql`](./migrations/20261013_user_email_and_business_key.sql) (adds `users.email` and `business.key_hash`). Then set the business key once, see [8.14](#814-users-and-password-reset).
 
 ### 2.3 Configure
 
@@ -72,8 +75,11 @@ PORT=8000
 HOST=127.0.0.1
 SUPABASE_DB_URL=postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres
 DB_POOL_MAX=10
+REDIS_URL=redis://127.0.0.1:6379
 CORS_ORIGINS=*
 BRANCH_SETTINGS_AUTH_ENABLED=false
+STRIPE_SECRET_TEST_KEY=sk_test_...
+RESEND_API_KEY=re_...
 ```
 
 Take the connection string from **Supabase > Project Settings > Database > Connection string** (use *Session pooler*). If it does not connect, see [Troubleshooting](#13-troubleshooting).
@@ -110,11 +116,16 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 |---|---|---|---|
 | `SUPABASE_DB_URL` | yes (or `DATABASE_URL`) | none | Postgres connection string. Takes priority over `DATABASE_URL`. |
 | `DATABASE_URL` | yes (or `SUPABASE_DB_URL`) | none | Fallback name for the same thing. |
+| `REDIS_URL` | yes | none | Redis connection string used for rate limiting. The server fails startup if Redis is unavailable. |
 | `PORT` | no | `8000` | Integer 0 to 65535. |
 | `HOST` | no | `127.0.0.1` | Interface to bind. Use `0.0.0.0` in a container. |
 | `DB_POOL_MAX` | no | `10` | Max pooled connections, integer 1 to 100. |
 | `CORS_ORIGINS` | no | `127.0.0.1` / `localhost` on ports 3000 and 3001 | Comma separated list of allowed browser origins, or `*` to allow any browser origin in dev. |
 | `BRANCH_SETTINGS_AUTH_ENABLED` | no | `false` | Turn branch-setting auth on when you have users/roles wired in. Leave it off for local development. |
+| `STRIPE_SECRET_TEST_KEY` | yes | none | Stripe secret key used by the `/payments/stripe/*` routes. |
+| `SHIFT4_SECRET_KEY` | no | none | Shift4 secret key (fallback provider). Without it the Shift4 routes answer 503. |
+| `RESEND_API_KEY` | yes | none | Resend API key, used for order status emails and password reset codes. |
+| `EMAIL_FROM` | no | `test_business <grillasmash@gmail.com>` | Sender of every email. This is a testing sender for the current Resend setup; override it with your verified business address in production. |
 
 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but **the backend does not use them yet**. They are for Supabase Auth, which is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 
@@ -144,23 +155,35 @@ Backend/
 ├── curl-tests.sh               end to end endpoint smoke test
 ├── package.json / tsconfig.json
 ├── test/
-│   └── schemas.test.ts         zod schema tests (no database needed)
+│   ├── schemas.test.ts         zod schema tests (no database needed)
+│   └── users.test.ts           password hashing, business key, reset codes, user schemas
 └── src/
     ├── server.ts               app wiring, listen, graceful shutdown
     ├── config.ts               env parsing, exports CONFIG
     ├── db.ts                   connection pool, dbAll/dbGet/dbRun, transaction, error mapping
+    ├── redis.ts                Redis client + startup/shutdown helpers
     ├── queries.ts              ALL SQL, static strings only
     ├── schemas.ts              zod request schemas and inferred request types
     ├── types.ts                row and response types
-    ├── helpers.ts              newId, groupBy, getRequiredRow, deleteById ...
-    ├── errors.ts               HttpError + badRequest / notFound / conflict / unprocessable
+    ├── helpers.ts              newId, groupBy, getRequiredRow, deleteById, normalizeAmount ...
+    ├── keys.ts                 hashKey / keysMatch (business key, reset codes)
+    ├── passwords.ts            scrypt hashPassword / verifyPassword
+    ├── passwordResets.ts       in-memory password reset codes
+    ├── email.ts                sendEmail through Resend (backend only, no route)
+    ├── orderEmails.ts          customer emails on order create / status change
+    ├── payProviders.ts         Stripe + (optional) Shift4 clients
+    ├── errors.ts               HttpError + badRequest / notFound / conflict / tooManyRequests / unprocessable
     ├── middleware/
     │   ├── validate.ts         parseInput(schema, input)
-    │   └── errorHandler.ts     notFoundHandler + errorHandler (the { detail } shape)
+    │   ├── errorHandler.ts     notFoundHandler + errorHandler (the { detail } shape)
+    │   ├── rateLimiter.ts      Redis-backed shared request budget, 429 when exceeded
+    │   ├── requireBranchManager.ts   active ADMIN / MANAGER check
+    │   └── requireBusinessKey.ts     X-Business-Key check for /user routes
     └── requestHandlers/        one router per resource
         ├── health.ts           business.ts        branches.ts        branchProducts.ts
         ├── categories.ts       products.ts        modifierGroups.ts  modifiers.ts
         └── productModifierGroups.ts               offers.ts          orders.ts
+            payment.ts          users.ts
 ```
 
 Every file starts with a comment block explaining its job.
@@ -226,7 +249,7 @@ Defined in [`schema.txt`](./schema.txt). 20 tables:
 | Branch pricing | `branch_product_overrides` |
 | Offers | `offers`, `offer_rules`, `offer_rule_products`, `offer_rule_modifier_groups`, `offer_rule_modifiers` |
 | Orders | `orders`, `order_items`, `order_item_modifiers`, `order_offers`, `payments` |
-| Admin | `users` (not used by the API yet) |
+| Admin | `users` (created and password-reset through `/user/*`, see [8.14](#814-users-and-password-reset)) |
 
 ### 7.1 Relationships
 
@@ -300,6 +323,8 @@ One business per deployment.
 | PUT | `/business/:businessId` | Partial update |
 
 Body fields: `name`\*, `slug`\*, `logo_url`, `currency` (default `GBP`). Update also takes `active` (boolean).
+
+`POST /business` also generates the **business key** and returns it once as `business_key`. Only its sha256 hash is stored (`business.key_hash`), it is never returned again and `GET /business` never includes it. Save it, the admin panel needs it for the `/user` routes.
 
 ```bash
 curl -X POST localhost:8000/business -H 'Content-Type: application/json' \
@@ -546,6 +571,8 @@ Worked example from the tests above: a £8.99 burger with Mayo (+50p) and BBQ (+
 
 `PENDING` (initial) → `ACCEPTED` → `PREPARING` → `READY` → `COMPLETED`, or `CANCELLED`. Any status can be set to any other, there are no transition rules yet.
 
+If the order has a `customer_email`, the customer is emailed on creation (`PENDING`) and on every status change (see `src/orderEmails.ts`). Email is fire and forget: a failed send is logged and never fails the request.
+
 ```bash
 curl -X PATCH localhost:8000/orders/status -H 'Content-Type: application/json' \
   -d '{"id":"c7cea41be001","status":"PREPARING"}'
@@ -573,6 +600,55 @@ curl -X PATCH localhost:8000/orders/status -H 'Content-Type: application/json' \
 ```
 
 `name`, `unit_price` and modifier `name` / `price` are snapshots taken at order time.
+
+### 8.14 Users and password reset
+
+Account creation and password reset for the admin panel. **Every `/user/*` route needs the business key** in the `X-Business-Key` header, otherwise 401. Passwords are hashed with scrypt, `password_hash` is never returned.
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| POST | `/user/login` | `username`\*, `password`\* | Sign in with a username and password. 200 with `{ id, username, role }`, 401 if credentials are invalid |
+| POST | `/user/new_admin` | `username`\*, `password`\*, `email`\* | Create an `ADMIN`. 201 with the user, 409 if the username or email is taken. Requires `X-Business-Key` |
+| POST | `/user/new_manager` | `username`\*, `password`\*, `email`\* | Create a `MANAGER`. Requires `X-Business-Key` |
+| POST | `/user/reset_password_request` | `email`\* | Emails a 6 digit code to the account's email. Always 200, whether or not the account exists. 429 while the previous code is still valid |
+| POST | `/user/reset_password` | `email`\*, `reset_code`\*, `new_password`\* | Sets the new password. 400 `Invalid or expired reset code` |
+
+Rules: `username` 3 to 50 characters, `password` 8 to 128, `email` valid (stored lowercase). A reset code is valid for 5 minutes, single use, dies after 5 wrong guesses, and a new one cannot be requested until the 5 minutes are up. Codes live in server memory (`src/passwordResets.ts`), so a restart invalidates them and several server instances would need the request and the reset to hit the same one.
+
+Setting the key on an existing business (new deployments get one from `POST /business`):
+
+```sql
+UPDATE public.business SET key_hash = encode(sha256('your-long-random-key'::bytea), 'hex');
+```
+
+```bash
+curl -X POST localhost:8000/user/login -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+  -d '{"username":"owner","password":"a-long-password"}'
+
+curl -X POST localhost:8000/user/new_admin -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+  -d '{"username":"owner","password":"a-long-password","email":"owner@example.com"}'
+
+curl -X POST localhost:8000/user/reset_password_request -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+  -d '{"email":"owner@example.com"}'
+
+curl -X POST localhost:8000/user/reset_password -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+  -d '{"email":"owner@example.com","reset_code":"123456","new_password":"another-long-password"}'
+```
+
+### 8.15 Payments
+
+Stripe is the main provider, Shift4 is a fallback (503 `Shift4 is not configured` without `SHIFT4_SECRET_KEY`). `amount` is normalised to pence: a number is taken as pence, a string with a `.` as pounds (`"12.50"` is 1250). Failures return `{ "success": false, "error", "error_message" }`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/payments/stripe/checkout-session?amount=&currency=` | Creates a PaymentIntent, returns `{ success, clientSecret }`. `/payments/stripe-checkout-session` is an alias |
+| POST | `/payments/stripe/charge` | Body `amount`, `currency`, `paymentMethodId`. Creates and confirms a PaymentIntent |
+| POST | `/payments/stripe/checkout-callback` | Body `stripeSessionId`. Verifies a Checkout session |
+| GET | `/payments/checkout-session?amount=&currency=` | Shift4 signed checkout request, returns `{ success, clientSecret }` |
+| POST | `/payments/charge` | Shift4. Body `amount`, `currency`, and `token` or `card` |
+| POST | `/payments/checkout-callback` | Shift4. Body `shift4ChargeId`. Verifies a charge |
+
+Success responses are `{ success, charge_id, amount, currency, status }` where `status` is `200` when paid and `402` when not.
 
 ---
 
@@ -623,7 +699,11 @@ The order flow was run against a real Postgres built from `schema.txt`: pricing 
 ## 11. Security notes
 
 - Branch-setting writes now require an active `ADMIN` or `MANAGER` user. The backend currently accepts `Authorization: Bearer <user-id>` where the user id comes from the `users` table; this is a stopgap until full Supabase Auth is wired in.
-- There is **no rate limiting** yet.
+- Rate limiting: all clients share one budget, 5 requests per second and 300 per minute. Going over either blocks **everyone** with 429 for 60 seconds (`Retry-After` header). It is backed by Redis and shared across instances.
+- The `/user/*` routes are guarded by the business key (`X-Business-Key`), which an admin panel running in a browser can read. Treat it as a shared secret for your own admin panel, not as user login.
+- Password reset codes are emailed, kept in memory only (hash), expire after 5 minutes and are limited to 5 guesses.
+- There is deliberately no HTTP route for sending email, an open one would let anyone send mail from your domain.
+- The `/payments/*` routes are still public and take the amount from the client; the order total is not checked against the payment yet.
 - SQL injection is not possible: all SQL is static and parameterised.
 - Prices on orders are computed server side, the client cannot set them.
 - The connection requires TLS (`ssl: "require"`).
@@ -672,10 +752,9 @@ Nothing extra to send. Each rule of an active `BUY_X_GET_Y` offer means "buy `qu
 **Not implemented yet**
 
 - Full authentication / roles. The branch-setting routes have a temporary id-based Bearer token gate, but the intended design is still Supabase Auth JWTs verified against `SUPABASE_JWKS_URL`, with admin / manager roles for write routes and per branch access for the KDS.
-- Rate limiting.
 - Configurable `BUY_X_GET_Y` (the offer has no fields for X and Y, so Y is always 1 free unit of the same rule's products).
 - Payment verification. A `payment` on an order is only recorded as `PENDING`, nothing confirms it with Stripe or another provider.
-- Order status emails / notifications.
+- A login endpoint for the `users` table (passwords can be set and reset, but nothing checks them yet).
 - A `/deals` resource. The word "deal" in the old project maps to **offers** here.
 - Delivery fee configuration. `delivery_fee` is currently supplied by the client, there is no per branch setting to calculate it.
 - Status transition rules (e.g. blocking `COMPLETED` back to `PENDING`).

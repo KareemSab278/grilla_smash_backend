@@ -38,6 +38,7 @@ import sql, { dbAll, dbGet, dbRun, transaction } from "../db";
 import type { Db } from "../db";
 import { badRequest, notFound } from "../errors";
 import { getRequiredRow, groupBy, newId, orNull, requireRow, unique } from "../helpers";
+import { notifyOrderStatus } from "../orderEmails";
 import { parseInput } from "../middleware/validate";
 import { loadAutomaticOffers, loadOffer } from "./offers";
 import { freeItems, priceBundle } from "../offerPricing";
@@ -393,6 +394,8 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
         return order;
     });
 
+    notifyOrderStatus(created.id, created.status);
+
     res.status(201).json({
         order_id: created.id,
         order_number: created.order_number,
@@ -412,7 +415,10 @@ const updateOrderStatus = async (req: Request, res: Response<OrderStatusResponse
 
     const updated = await dbGet<OrderStatusResponse>(sql, QUERIES.PATCH.ORDER_STATUS, [data.id, data.status]);
 
-    res.json(requireRow(updated, "order"));
+    const order = requireRow(updated, "order");
+    notifyOrderStatus(order.id, order.status);
+
+    res.json(order);
 };
 
 // ========================================

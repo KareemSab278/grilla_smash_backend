@@ -56,6 +56,38 @@ export const businessUpdateSchema = z.object({
 });
 
 // ========================================
+// USERS
+// ========================================
+
+const password = z.string().min(8).max(128);
+
+export const userCreateSchema = z.object({
+    username: z.string().trim().min(3).max(50),
+    password,
+    email: z.email().toLowerCase(),
+});
+
+export const userLoginSchema = z.object({
+    username: z.string().trim().min(3).max(50),
+    password,
+});
+
+export const userPasswordResetRequestSchema = z.object({
+    email: z.email().toLowerCase(),
+});
+
+export const userPasswordResetSchema = z.object({
+    email: z.email().toLowerCase(),
+    reset_code: z.string().regex(/^\d{6}$/, "Invalid reset code"),
+    new_password: password,
+});
+
+export const userPasswordResetLegacySchema = z.object({
+    reset_code: z.string().regex(/^\d{6}$/, "Invalid reset code"),
+    new_password: password,
+});
+
+// ========================================
 // BRANCHES
 // ========================================
 
@@ -346,6 +378,11 @@ export const orderStatusUpdateSchema = z.object({
 
 export type BusinessCreate = z.infer<typeof businessCreateSchema>;
 export type BusinessUpdate = z.infer<typeof businessUpdateSchema>;
+export type UserCreate = z.infer<typeof userCreateSchema>;
+export type UserLogin = z.infer<typeof userLoginSchema>;
+export type UserPasswordResetRequest = z.infer<typeof userPasswordResetRequestSchema>;
+export type UserPasswordReset = z.infer<typeof userPasswordResetSchema>;
+export type UserPasswordResetLegacy = z.infer<typeof userPasswordResetLegacySchema>;
 export type BranchCreate = z.infer<typeof branchCreateSchema>;
 export type BranchUpdate = z.infer<typeof branchUpdateSchema>;
 export type OpeningHoursInput = z.infer<typeof openingHoursSchema>;
