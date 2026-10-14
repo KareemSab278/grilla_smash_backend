@@ -75,7 +75,6 @@ PORT=8000
 HOST=127.0.0.1
 SUPABASE_DB_URL=postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres
 DB_POOL_MAX=10
-REDIS_URL=redis://127.0.0.1:6379
 CORS_ORIGINS=*
 BRANCH_SETTINGS_AUTH_ENABLED=false
 STRIPE_SECRET_TEST_KEY=sk_test_...
@@ -116,7 +115,6 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 |---|---|---|---|
 | `SUPABASE_DB_URL` | yes (or `DATABASE_URL`) | none | Postgres connection string. Takes priority over `DATABASE_URL`. |
 | `DATABASE_URL` | yes (or `SUPABASE_DB_URL`) | none | Fallback name for the same thing. |
-| `REDIS_URL` | yes | none | Redis connection string used for rate limiting. The server fails startup if Redis is unavailable. |
 | `PORT` | no | `8000` | Integer 0 to 65535. |
 | `HOST` | no | `127.0.0.1` | Interface to bind. Use `0.0.0.0` in a container. |
 | `DB_POOL_MAX` | no | `10` | Max pooled connections, integer 1 to 100. |
@@ -161,7 +159,6 @@ Backend/
     ├── server.ts               app wiring, listen, graceful shutdown
     ├── config.ts               env parsing, exports CONFIG
     ├── db.ts                   connection pool, dbAll/dbGet/dbRun, transaction, error mapping
-    ├── redis.ts                Redis client + startup/shutdown helpers
     ├── queries.ts              ALL SQL, static strings only
     ├── schemas.ts              zod request schemas and inferred request types
     ├── types.ts                row and response types
@@ -176,7 +173,7 @@ Backend/
     ├── middleware/
     │   ├── validate.ts         parseInput(schema, input)
     │   ├── errorHandler.ts     notFoundHandler + errorHandler (the { detail } shape)
-    │   ├── rateLimiter.ts      Redis-backed shared request budget, 429 when exceeded
+    │   ├── rateLimiter.ts      in-memory shared request budget, 429 when exceeded
     │   ├── requireBranchManager.ts   active ADMIN / MANAGER check
     │   └── requireBusinessKey.ts     X-Business-Key check for /user routes
     └── requestHandlers/        one router per resource
@@ -699,7 +696,7 @@ The order flow was run against a real Postgres built from `schema.txt`: pricing 
 ## 11. Security notes
 
 - Branch-setting writes now require an active `ADMIN` or `MANAGER` user. The backend currently accepts `Authorization: Bearer <user-id>` where the user id comes from the `users` table; this is a stopgap until full Supabase Auth is wired in.
-- Rate limiting: all clients share one budget, 5 requests per second and 300 per minute. Going over either blocks **everyone** with 429 for 60 seconds (`Retry-After` header). It is backed by Redis and shared across instances.
+- Rate limiting: all clients in one backend process share one budget, 30 requests per second and 100 per minute. Going over either blocks **everyone handled by that process** with 429 for 60 seconds (`Retry-After` header). Counters are in memory and reset on restart; multiple backend instances have independent budgets.
 - The `/user/*` routes are guarded by the business key (`X-Business-Key`), which an admin panel running in a browser can read. Treat it as a shared secret for your own admin panel, not as user login.
 - Password reset codes are emailed, kept in memory only (hash), expire after 5 minutes and are limited to 5 guesses.
 - There is deliberately no HTTP route for sending email, an open one would let anyone send mail from your domain.

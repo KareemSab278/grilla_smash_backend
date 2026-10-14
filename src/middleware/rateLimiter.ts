@@ -1,130 +1,96 @@
 /*
-    RATE LIMITER - ONE SHARED BUDGET FOR EVERY CLIENT COMBINED (NOT PER IP).
+    RATE LIMITER - ONE SHARED IN-PROCESS BUDGET FOR EVERY CLIENT (NOT PER IP).
 
-    Every request checks a Redis-backed global block state first.
-    If not blocked, the shared request budget is consumed from Redis-backed limiters:
-    - 5 requests per second
-    - 300 requests per minute
-    Exceeding either limit sets the same 60-second global block key in Redis.
+    - 30 requests per second
+    - 100 requests per minute
+    Exceeding either limit blocks every request in this process for 60 seconds.
 */
 
 import type { RequestHandler } from "express";
-import { RateLimiterRedis, RateLimiterRes } from "rate-limiter-flexible";
-import type { RedisClientType } from "redis";
+import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 
-const MAX_REQUESTS_PER_SECOND = 5;
-const MAX_REQUESTS_PER_MINUTE = 300;
-const BLOCK_DURATION_SECONDS = 60;
-
+const MAX_REQUESTS_PER_SECOND = 30;
+const MAX_REQUESTS_PER_MINUTE = 100;
+const BLOCK_DURATION_MS = 60_000;
 const SHARED_KEY = "all-requests";
-const BLOCK_KEY = "rate-limit:block:global";
-const SECOND_PREFIX = "rate-limit:second:";
-const MINUTE_PREFIX = "rate-limit:minute:";
 
-type RedisLike = Pick<RedisClientType, "ttl" | "set">;
-type RateLimiterLike = Pick<RateLimiterRedis, "consume">;
+type RateLimiterLike = Pick<RateLimiterMemory, "consume">;
 
 export type RateLimiterDeps = {
-    redis: RedisLike;
     perSecondLimiter: RateLimiterLike;
     perMinuteLimiter: RateLimiterLike;
+    getNow: () => number;
+    getBlockedUntil: () => number;
+    setBlockedUntil: (timestamp: number) => void;
 };
 
-type BlockResult = {
-    blocked: true;
-    retryAfterSeconds: number;
-};
+let blockedUntil = 0;
 
-type AllowResult = {
-    blocked: false;
+const perSecondLimiter = new RateLimiterMemory({
+    points: MAX_REQUESTS_PER_SECOND,
+    duration: 1,
+});
+
+const perMinuteLimiter = new RateLimiterMemory({
+    points: MAX_REQUESTS_PER_MINUTE,
+    duration: 60,
+});
+
+const defaultDeps: RateLimiterDeps = {
+    perSecondLimiter,
+    perMinuteLimiter,
+    getNow: Date.now,
+    getBlockedUntil: () => blockedUntil,
+    setBlockedUntil: timestamp => {
+        blockedUntil = timestamp;
+    },
 };
 
 const isRateLimiterRes = (value: unknown): value is RateLimiterRes => value instanceof RateLimiterRes;
 
-const readGlobalBlock = async (redis: RedisLike): Promise<number | null> => {
-    const ttl = await redis.ttl(BLOCK_KEY);
-    return ttl > 0 ? ttl : null;
+const activateGlobalBlock = (dependencies: RateLimiterDeps): number => {
+    const expiry = Math.max(dependencies.getBlockedUntil(), dependencies.getNow() + BLOCK_DURATION_MS);
+    dependencies.setBlockedUntil(expiry);
+    return Math.max(1, Math.ceil((expiry - dependencies.getNow()) / 1000));
 };
 
-const activateGlobalBlock = async (redis: RedisLike): Promise<number> => {
-    const existing = await redis.ttl(BLOCK_KEY);
-    if (existing > 0) return existing;
-
-    await redis.set(BLOCK_KEY, "1", { EX: BLOCK_DURATION_SECONDS, NX: true });
-    return BLOCK_DURATION_SECONDS;
-};
-
-const rejectWithBlock = async (redis: RedisLike): Promise<BlockResult> => {
-    const retryAfterSeconds = await activateGlobalBlock(redis);
-    return { blocked: true, retryAfterSeconds };
-};
-
-const evaluateRequest = async (dependencies: RateLimiterDeps): Promise<BlockResult | AllowResult> => {
-    const blocked = await readGlobalBlock(dependencies.redis);
-    if (blocked !== null) {
-        return { blocked: true, retryAfterSeconds: blocked };
-    }
-
-    try {
-        await dependencies.perSecondLimiter.consume(SHARED_KEY);
-    } catch (err: unknown) {
-        if (!isRateLimiterRes(err)) throw err;
-        return await rejectWithBlock(dependencies.redis);
-    }
-
-    try {
-        await dependencies.perMinuteLimiter.consume(SHARED_KEY);
-    } catch (err: unknown) {
-        if (!isRateLimiterRes(err)) throw err;
-        return await rejectWithBlock(dependencies.redis);
-    }
-
-    return { blocked: false };
-};
-
-export const createRateLimiterMiddleware = (dependencies: RateLimiterDeps): RequestHandler => {
+export const createRateLimiterMiddleware = (dependencies: RateLimiterDeps = defaultDeps): RequestHandler => {
     return async (_req, res, next) => {
+        const remainingBlockMs = dependencies.getBlockedUntil() - dependencies.getNow();
+        if (remainingBlockMs > 0) {
+            res.set("Retry-After", String(Math.ceil(remainingBlockMs / 1000)));
+            res.status(429).json({ detail: "Too many requests - Please wait " + Math.ceil(remainingBlockMs / 1000) + " seconds" });
+            return;
+        }
+
         try {
-            const result = await evaluateRequest(dependencies);
-            if (result.blocked) {
-                res.set("Retry-After", String(result.retryAfterSeconds));
-                res.status(429).json({ detail: "Too many requests" });
+            await dependencies.perSecondLimiter.consume(SHARED_KEY);
+        } catch (err: unknown) {
+            if (!isRateLimiterRes(err)) {
+                next(err);
                 return;
             }
 
-            next();
-        } catch (err) {
-            next(err);
+            res.set("Retry-After", String(activateGlobalBlock(dependencies)));
+            res.status(429).json({ detail: "Too many requests - Please wait " + String(activateGlobalBlock(dependencies)) + " seconds" });
+            return;
         }
+
+        try {
+            await dependencies.perMinuteLimiter.consume(SHARED_KEY);
+        } catch (err: unknown) {
+            if (!isRateLimiterRes(err)) {
+                next(err);
+                return;
+            }
+
+            res.set("Retry-After", String(activateGlobalBlock(dependencies)));
+            res.status(429).json({ detail: "Too many requests - Please wait " + String(activateGlobalBlock(dependencies)) + " seconds" });
+            return;
+        }
+
+        next();
     };
 };
 
-export const createRedisRateLimiterMiddleware = (redis: RedisClientType): RequestHandler => {
-    const perSecondLimiter = new RateLimiterRedis({
-        storeClient: redis,
-        keyPrefix: SECOND_PREFIX,
-        points: MAX_REQUESTS_PER_SECOND,
-        duration: 1,
-    });
-    const perMinuteLimiter = new RateLimiterRedis({
-        storeClient: redis,
-        keyPrefix: MINUTE_PREFIX,
-        points: MAX_REQUESTS_PER_MINUTE,
-        duration: 60,
-    });
-
-    return createRateLimiterMiddleware({ redis, perSecondLimiter, perMinuteLimiter });
-};
-
-export const rateLimiterInternals = {
-    BLOCK_DURATION_SECONDS,
-    BLOCK_KEY,
-    MAX_REQUESTS_PER_MINUTE,
-    MAX_REQUESTS_PER_SECOND,
-    SHARED_KEY,
-    SECOND_PREFIX,
-    MINUTE_PREFIX,
-    readGlobalBlock,
-    activateGlobalBlock,
-    evaluateRequest,
-};
+export const rateLimiterMiddleware = createRateLimiterMiddleware();

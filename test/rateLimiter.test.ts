@@ -1,5 +1,5 @@
 /*
-    RATE LIMITER TESTS - cover the Redis-backed shared budget behavior.
+    RATE LIMITER TESTS - cover the shared in-memory request budget.
 */
 
 import assert from "node:assert/strict";
@@ -8,10 +8,11 @@ import test from "node:test";
 import { RateLimiterRes } from "rate-limiter-flexible";
 import { createRateLimiterMiddleware, type RateLimiterDeps } from "../src/middleware/rateLimiter";
 
-type SharedState = {
+type State = {
     secondCount: number;
     minuteCount: number;
-    blockTtl: number | null;
+    blockedUntil: number;
+    now: number;
 };
 
 type MiddlewareResult = {
@@ -47,49 +48,40 @@ const createResponse = () => {
     return { result, res };
 };
 
-const invoke = async (
-    middleware: ReturnType<typeof createRateLimiterMiddleware>
-): Promise<MiddlewareResult & { res: unknown }> => {
+const invoke = async (middleware: ReturnType<typeof createRateLimiterMiddleware>): Promise<MiddlewareResult> => {
     const { result, res } = createResponse();
     await middleware({} as never, res as never, () => {
         result.nextCalls += 1;
     });
 
-    return { ...result, res };
+    return result;
 };
 
-const createSharedRedis = (state: SharedState) => ({
-    ttl: async () => (state.blockTtl === null ? -2 : state.blockTtl),
-    set: async (_key: string, _value: string, options?: { EX?: number; NX?: boolean }) => {
-        if (state.blockTtl !== null && state.blockTtl > 0 && options?.NX) return null;
-        state.blockTtl = options?.EX ?? 60;
-        return "OK" as const;
-    },
-});
-
-const createLimiter = (state: SharedState, kind: "second" | "minute", limit: number) => ({
+const createLimiter = (state: State, kind: "second" | "minute", limit: number) => ({
     consume: async () => {
         if (kind === "second") state.secondCount += 1;
         if (kind === "minute") state.minuteCount += 1;
 
         const value = kind === "second" ? state.secondCount : state.minuteCount;
-        if (value > limit) {
-            throw new RateLimiterRes(0, 1000, value, false);
-        }
+        if (value > limit) throw new RateLimiterRes(0, 1000, value, false);
     },
 });
 
-const createDeps = (state: SharedState, secondLimit: number = 5, minuteLimit: number = 300): RateLimiterDeps => ({
-    redis: createSharedRedis(state),
+const createDeps = (state: State, secondLimit = 30, minuteLimit = 100): RateLimiterDeps => ({
     perSecondLimiter: createLimiter(state, "second", secondLimit),
     perMinuteLimiter: createLimiter(state, "minute", minuteLimit),
+    getNow: () => state.now,
+    getBlockedUntil: () => state.blockedUntil,
+    setBlockedUntil: timestamp => {
+        state.blockedUntil = timestamp;
+    },
 });
 
-test("rejects the sixth request within one second", async () => {
-    const state: SharedState = { secondCount: 0, minuteCount: 0, blockTtl: null };
+test("rejects the 31st request within one second and blocks globally", async () => {
+    const state: State = { secondCount: 0, minuteCount: 0, blockedUntil: 0, now: 10_000 };
     const middleware = createRateLimiterMiddleware(createDeps(state));
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 30; i++) {
         const result = await invoke(middleware);
         assert.equal(result.statusCode, null);
         assert.equal(result.nextCalls, 1);
@@ -99,14 +91,14 @@ test("rejects the sixth request within one second", async () => {
     assert.equal(blocked.statusCode, 429);
     assert.equal(blocked.headers.get("retry-after"), "60");
     assert.deepEqual(blocked.body, { detail: "Too many requests" });
-    assert.equal(state.blockTtl, 60);
+    assert.equal(state.blockedUntil, state.now + 60_000);
 });
 
-test("rejects the 301st request within one minute when per-second is not hit", async () => {
-    const state: SharedState = { secondCount: 0, minuteCount: 0, blockTtl: null };
-    const middleware = createRateLimiterMiddleware(createDeps(state, 1000, 300));
+test("rejects the 101st request within one minute when per-second is not hit", async () => {
+    const state: State = { secondCount: 0, minuteCount: 0, blockedUntil: 0, now: 10_000 };
+    const middleware = createRateLimiterMiddleware(createDeps(state, 1000, 100));
 
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 100; i++) {
         const result = await invoke(middleware);
         assert.equal(result.statusCode, null);
         assert.equal(result.nextCalls, 1);
@@ -116,38 +108,23 @@ test("rejects the 301st request within one minute when per-second is not hit", a
     assert.equal(blocked.statusCode, 429);
     assert.equal(blocked.headers.get("retry-after"), "60");
     assert.deepEqual(blocked.body, { detail: "Too many requests" });
-    assert.equal(state.blockTtl, 60);
 });
 
-test("shares counters and block state across backend instances", async () => {
-    const state: SharedState = { secondCount: 0, minuteCount: 0, blockTtl: null };
+test("all middleware instances in this process share the global block state", async () => {
+    const state: State = { secondCount: 0, minuteCount: 0, blockedUntil: 0, now: 10_000 };
     const instanceA = createRateLimiterMiddleware(createDeps(state));
     const instanceB = createRateLimiterMiddleware(createDeps(state));
 
-    const first = await invoke(instanceA);
-    assert.equal(first.statusCode, null);
-    assert.equal(first.nextCalls, 1);
+    for (let i = 0; i < 30; i++) await invoke(instanceA);
+    assert.equal((await invoke(instanceA)).statusCode, 429);
 
-    const second = await invoke(instanceB);
-    assert.equal(second.statusCode, null);
-    assert.equal(second.nextCalls, 1);
-    assert.equal(state.secondCount, 2);
-
-    for (let i = 0; i < 3; i++) await invoke(instanceA);
-
-    const blocked = await invoke(instanceA);
-    assert.equal(blocked.statusCode, 429);
-    assert.equal(state.blockTtl, 60);
-
-    const sharedBlock = await invoke(instanceB);
-    assert.equal(sharedBlock.statusCode, 429);
-    assert.equal(sharedBlock.headers.get("retry-after"), "60");
-    assert.equal(state.secondCount, 6);
-    assert.equal(state.minuteCount, 5);
+    const blockedOnOtherInstance = await invoke(instanceB);
+    assert.equal(blockedOnOtherInstance.statusCode, 429);
+    assert.equal(blockedOnOtherInstance.headers.get("retry-after"), "60");
 });
 
-test("returns the remaining block time in Retry-After", async () => {
-    const state: SharedState = { secondCount: 0, minuteCount: 0, blockTtl: 12 };
+test("Retry-After reports the remaining block duration", async () => {
+    const state: State = { secondCount: 0, minuteCount: 0, blockedUntil: 21_500, now: 10_000 };
     const middleware = createRateLimiterMiddleware(createDeps(state));
 
     const result = await invoke(middleware);
