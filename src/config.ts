@@ -12,15 +12,21 @@ import path from "node:path";
 
 // ENV VARIABLES AND DEFAULTS
 const ENV_PATH = path.resolve(process.cwd(), ".env");
-const EMAIL = String(process.env.EMAIL_FROM) ?? "RESEND EMAIL NOT SET UP";
+if (existsSync(ENV_PATH)) {
+    process.loadEnvFile(ENV_PATH);
+}
+
+const EMAIL_FROM_DEFAULT = "test_business <grillasmash@gmail.com>";
+const EMAIL_FROM_PATTERN = /^(?:[^<>]+<[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+>|[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)$/;
+const EMAIL_FROM = process.env.EMAIL_FROM?.trim() || EMAIL_FROM_DEFAULT;
+if (!EMAIL_FROM_PATTERN.test(EMAIL_FROM)) {
+    throw new Error("Invalid EMAIL_FROM; use email@example.com or Name <email@example.com>");
+}
+
 const CORS_ORIGINS: readonly string[] = [process.env.CORS_ORIGINS ?? '*'];
 const DEFAULT_PORT = Number(process.env.DEFAULT_PORT ?? 8000);
 const DEFAULT_HOST = process.env.DEFAULT_HOST ?? "127.0.0.1";
 const DEFAULT_DB_POOL_MAX = Number(process.env.DEFAULT_DB_POOL_MAX ?? 10);
-
-if (existsSync(ENV_PATH)) {
-    process.loadEnvFile(ENV_PATH);
-}
 
 
 type Config = {
@@ -95,5 +101,5 @@ export const CONFIG: Config = {
     stripeSecretKey: requireEnv("STRIPE_SECRET_TEST_KEY"),
     shift4SecretKey: process.env.SHIFT4_SECRET_KEY || undefined,
     resendApiKey: requireEnv("RESEND_API_KEY"),
-    emailFrom: EMAIL,
+    emailFrom: EMAIL_FROM,
 };

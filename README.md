@@ -124,7 +124,7 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `USE_STRIPE` | no | `true` | Set to `false` to route the payment endpoints through Shift4 instead of Stripe. |
 | `SHIFT4_SECRET_KEY` | no | none | Shift4 secret key. Required when `USE_STRIPE=false`; otherwise Shift4 is not used. |
 | `RESEND_API_KEY` | yes | none | Resend API key, used for order status emails and password reset codes. |
-| `EMAIL_FROM` | no | `test_business <grillasmash@gmail.com>` | Sender of every email. This is a testing sender for the current Resend setup; override it with your verified business address in production. |
+| `EMAIL_FROM` | no | `test_business <grillasmash@gmail.com>` | Sender of every email, in `email@example.com` or `Name <email@example.com>` format. Configure a sender/domain verified with Resend for delivery; the default is for the current test setup. |
 
 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but **the backend does not use them yet**. They are for Supabase Auth, which is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 
@@ -601,17 +601,76 @@ curl -X PATCH localhost:8000/orders/status -H 'Content-Type: application/json' \
 
 ### 8.14 Users and password reset
 
-Account creation and password reset for the admin panel. **Every `/user/*` route needs the business key** in the `X-Business-Key` header, otherwise 401. Passwords are hashed with scrypt, `password_hash` is never returned.
+Account creation and password reset for the admin panel. Account-creation routes require the `X-Business-Key` header; login and password-reset routes do not. The middleware compares the supplied key to the stored SHA-256 hash in constant time. A missing or invalid key returns 401. Passwords are hashed with scrypt, and `password_hash` is never returned.
 
 | Method | Path | Body | Description |
 |---|---|---|---|
-| POST | `/user/login` | `username`\*, `password`\* | Sign in with a username and password. 200 with `{ id, username, role }`, 401 if credentials are invalid |
-| POST | `/user/new_admin` | `username`\*, `password`\*, `email`\* | Create an `ADMIN`. 201 with the user, 409 if the username or email is taken. Requires `X-Business-Key` |
+| POST | `/user/login` | `username`\*, `password`\* | Sign in with a username and password. 200 with `{ id, username, role }`, 401 if credentials are invalid. No business key required |
+| POST | `/user/admin_creation_code` | `username`\*, `email`\* | Email a five-minute verification code and pending-account notice to every active admin with an email address. Requires `X-Business-Key` |
+| POST | `/user/new_admin` | `username`\*, `password`\*, `email`\*, `verification_code`\* | Create an `ADMIN` using a code requested for the same username/email. 201 with `{ user, admin_notifications }`. Requires `X-Business-Key`; the first admin must be manually provisioned |
 | POST | `/user/new_manager` | `username`\*, `password`\*, `email`\* | Create a `MANAGER`. Requires `X-Business-Key` |
 | POST | `/user/reset_password_request` | `email`\* | Emails a 6 digit code to the account's email. Always 200, whether or not the account exists. 429 while the previous code is still valid |
-| POST | `/user/reset_password` | `email`\*, `reset_code`\*, `new_password`\* | Sets the new password. 400 `Invalid or expired reset code` |
+| POST | `/user/reset_password` | `email`\*, `reset_code`\*, `new_password`\* | Sets the new password. 400 `Invalid or expired reset code`. No business key required |
 
-Rules: `username` 3 to 50 characters, `password` 8 to 128, `email` valid (stored lowercase). A reset code is valid for 5 minutes, single use, dies after 5 wrong guesses, and a new one cannot be requested until the 5 minutes are up. Codes live in server memory (`src/passwordResets.ts`), so a restart invalidates them and several server instances would need the request and the reset to hit the same one.
+#### Creating an admin
+
+Creating an admin is a two-step flow. Both requests require `X-Business-Key`.
+
+1. Request a code with `POST /user/admin_creation_code` and the proposed username and email:
+
+   ```json
+   { "username": "new_admin", "email": "new-admin@example.com" }
+   ```
+
+   The backend emails the same six-digit code and pending-account notice to every active `ADMIN`
+   with a non-null email address. Success is `200`:
+
+   ```json
+   { "message": "Verification code sent to all active administrators", "expires_in_seconds": 300 }
+   ```
+
+2. Submit `POST /user/new_admin` with the same username/email, the new password, and the code:
+
+   ```json
+   {
+     "username": "new_admin",
+     "password": "a-long-password",
+     "email": "new-admin@example.com",
+     "verification_code": "123456"
+   }
+   ```
+
+   Success is `201` with `{ "user": <public user>, "admin_notifications": { "sent": 2, "failed": 0 } }`.
+   The verification code is single-use. `admin_notifications` counts completion emails sent to existing
+   active admins; if `failed` is non-zero, the account was created but some completion emails failed.
+
+Codes expire after 5 minutes, are invalidated after 5 incorrect guesses, and cannot be re-requested for
+the same username/email during the expiry window. Codes are stored as hashes in server memory, so a
+restart invalidates them and multiple server instances require the code request and verification to
+reach the same instance. Admin creation returns `409` if there are no active admins with email
+addresses; manually provision the first admin in the database before using this flow.
+
+#### Roles and current authorization
+
+The only roles are `ADMIN` and `MANAGER`. Both can log in. Both pass the branch-settings authorization
+check when `BRANCH_SETTINGS_AUTH_ENABLED=true`; there is no distinct manager permission set or
+per-branch assignment in the current backend. That check accepts a user ID as a bearer value, not a
+secure login token. The setting defaults to `false`, which bypasses the branch-settings check for local
+development. Most other API routes are not role-protected.
+
+| Operation | Current backend gate |
+|---|---|
+| Create an `ADMIN` | Business key plus code emailed to all active admins with email addresses |
+| Create a `MANAGER` | Business key |
+| Write branch settings | Active `ADMIN` or `MANAGER` only when the auth setting is enabled |
+| Other API operations | Most currently have no user-role authorization |
+
+The business key is a shared secret for account creation, not proof of a particular admin's identity.
+Do not use the role in the login response as evidence that other sensitive API operations are protected.
+See the [frontend user/admin guide](./docs/frontend-user-admin-guide.md) for the user-facing request and
+response details and frontend implementation notes.
+
+Rules: `username` 3 to 50 characters, `password` 8 to 128, `email` valid (stored lowercase). Password-reset codes have the same five-minute expiry and five-attempt limit.
 
 Setting the key on an existing business (new deployments get one from `POST /business`):
 
@@ -620,16 +679,19 @@ UPDATE public.business SET key_hash = encode(sha256('your-long-random-key'::byte
 ```
 
 ```bash
-curl -X POST localhost:8000/user/login -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+curl -X POST localhost:8000/user/login -H 'Content-Type: application/json' \
   -d '{"username":"owner","password":"a-long-password"}'
 
-curl -X POST localhost:8000/user/new_admin -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
-  -d '{"username":"owner","password":"a-long-password","email":"owner@example.com"}'
+curl -X POST localhost:8000/user/admin_creation_code -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+  -d '{"username":"new_admin","email":"new-admin@example.com"}'
 
-curl -X POST localhost:8000/user/reset_password_request -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+curl -X POST localhost:8000/user/new_admin -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+  -d '{"username":"new_admin","password":"a-long-password","email":"new-admin@example.com","verification_code":"123456"}'
+
+curl -X POST localhost:8000/user/reset_password_request -H 'Content-Type: application/json' \
   -d '{"email":"owner@example.com"}'
 
-curl -X POST localhost:8000/user/reset_password -H 'Content-Type: application/json' -H 'X-Business-Key: <key>' \
+curl -X POST localhost:8000/user/reset_password -H 'Content-Type: application/json' \
   -d '{"email":"owner@example.com","reset_code":"123456","new_password":"another-long-password"}'
 ```
 

@@ -67,6 +67,15 @@ export const userCreateSchema = z.object({
     email: z.email().toLowerCase(),
 });
 
+export const adminCreationCodeRequestSchema = z.object({
+    username: z.string().trim().min(3).max(50),
+    email: z.email().toLowerCase(),
+});
+
+export const adminCreateSchema = userCreateSchema.extend({
+    verification_code: z.string().regex(/^\d{6}$/, "Invalid verification code"),
+});
+
 export const userLoginSchema = z.object({
     username: z.string().trim().min(3).max(50),
     password,

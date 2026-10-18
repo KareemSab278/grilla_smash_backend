@@ -10,7 +10,8 @@
 
     ROUTES:
     POST /user/login                            sign in a user   { username, password }
-    POST /user/new_admin                        create an ADMIN  { username, password, email }
+    POST /user/admin_creation_code              email a verification code to all active admins { username, email }
+    POST /user/new_admin                        create an ADMIN  { username, password, email, verification_code }
     POST /user/new_manager                      create a MANAGER { username, password, email }
     POST /user/reset_password_request           emails a 6 digit code, valid 5 minutes (see passwordResets.ts)
     POST /user/reset_password                   { email, reset_code, new_password } sets the new password
@@ -21,15 +22,23 @@
 import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";
-import sql, { dbGet } from "../db";
+import sql, { dbAll, dbGet } from "../db";
 import { sendEmail } from "../email";
-import { badRequest, unauthorized } from "../errors";
+import { badRequest, conflict, unauthorized } from "../errors";
 import { newId, requireRow } from "../helpers";
 import { requireBusinessKey } from "../middleware/requireBusinessKey";
 import { parseInput } from "../middleware/validate";
 import { consumeResetCode, discardResetCode, issueResetCode, RESET_WINDOW_MS } from "../passwordResets";
+import {
+    ADMIN_CREATION_CODE_WINDOW_MS,
+    consumeAdminCreationCode,
+    discardAdminCreationCode,
+    issueAdminCreationCode,
+} from "../adminCreationCodes";
 import { hashPassword, verifyPassword } from "../passwords";
 import {
+    adminCreateSchema,
+    adminCreationCodeRequestSchema,
     userCreateSchema,
     userLoginSchema,
     userPasswordResetLegacySchema,
@@ -41,11 +50,18 @@ import type { PublicUser, UserRow } from "../types";
 type UsernameParams = { username: string };
 type MessageResponse = { message: string };
 type LoginResponse = Pick<UserRow, "id" | "username" | "role">;
+type AdminCreationCodeResponse = { message: string; expires_in_seconds: number };
+type CreateAdminResponse = {
+    user: PublicUser;
+    admin_notifications: { sent: number; failed: number };
+};
+type AdminEmailRow = { email: string };
 
 const router = express.Router();
 
 router.post("/user/login", async (req, res) => await login(req, res));
-router.post("/user/new_admin", requireBusinessKey, async (req, res) => await createUser(req, res, "ADMIN"));
+router.post("/user/admin_creation_code", requireBusinessKey, async (req, res) => await requestAdminCreationCode(req, res));
+router.post("/user/new_admin", requireBusinessKey, async (req, res) => await createAdmin(req, res));
 router.post("/user/new_manager", requireBusinessKey, async (req, res) => await createUser(req, res, "MANAGER"));
 router.post("/user/reset_password_request", async (req, res) => await requestPasswordResetByEmail(req, res));
 router.post("/user/reset_password", async (req, res) => await resetPasswordByEmail(req, res));
@@ -79,6 +95,86 @@ const createUser = async (req: Request, res: Response<PublicUser>, role: UserRow
     ]);
 
     res.status(201).json(requireRow(created, "user"));
+};
+
+// ========================================
+
+const requestAdminCreationCode = async (
+    req: Request,
+    res: Response<AdminCreationCodeResponse>
+): Promise<void> => {
+    const data = parseInput(adminCreationCodeRequestSchema, req.body);
+    const adminEmails = await dbAll<AdminEmailRow>(sql, QUERIES.GET.ADMIN_EMAILS);
+
+    if (adminEmails.length === 0) {
+        throw conflict("No active admin email addresses are configured; seed the first admin manually");
+    }
+
+    const code = issueAdminCreationCode(data.username, data.email);
+    const message = [
+        `An admin account creation was requested for ${data.username} (${data.email}).`,
+        `Verification code: ${code}`,
+        `The code expires in ${ADMIN_CREATION_CODE_WINDOW_MS / 60_000} minutes and can only be used once.`,
+        "If you did not expect this request, do not share the code.",
+    ].join("\n");
+
+    const results = await Promise.allSettled(adminEmails.map(({ email }) => sendEmail({
+        to: email,
+        subject: "Admin account creation verification",
+        title: "Admin account verification",
+        message,
+    })));
+    const failed = results.filter(result => result.status === "rejected").length;
+
+    if (failed > 0) {
+        discardAdminCreationCode(data.username, data.email);
+        throw new Error(`Failed to send admin creation verification email to ${failed} administrator(s)`);
+    }
+
+    res.json({
+        message: "Verification code sent to all active administrators",
+        expires_in_seconds: ADMIN_CREATION_CODE_WINDOW_MS / 1000,
+    });
+};
+
+// ========================================
+
+const createAdmin = async (req: Request, res: Response<CreateAdminResponse>): Promise<void> => {
+    const data = parseInput(adminCreateSchema, req.body);
+    const adminEmails = await dbAll<AdminEmailRow>(sql, QUERIES.GET.ADMIN_EMAILS);
+
+    if (adminEmails.length === 0) {
+        throw conflict("No active admin email addresses are configured; seed the first admin manually");
+    }
+
+    if (!consumeAdminCreationCode(data.username, data.email, data.verification_code)) {
+        throw badRequest("Invalid or expired verification code");
+    }
+
+    const created = await dbGet<PublicUser>(sql, QUERIES.POST.USER, [
+        newId(),
+        data.username,
+        await hashPassword(data.password),
+        data.email,
+        "ADMIN",
+    ]);
+    const user = requireRow(created, "user");
+    const notification = [
+        `A new admin account has been created for ${user.username} (${user.email}).`,
+        "If you did not expect this, contact the business owner.",
+    ].join("\n");
+    const results = await Promise.allSettled(adminEmails.map(({ email }) => sendEmail({
+        to: email,
+        subject: "New admin account created",
+        title: "New admin account",
+        message: notification,
+    })));
+    const sent = results.filter(result => result.status === "fulfilled").length;
+
+    res.status(201).json({
+        user,
+        admin_notifications: { sent, failed: results.length - sent },
+    });
 };
 
 // ========================================

@@ -52,9 +52,16 @@ const USER_PUBLIC_COLUMNS = "id, username, email, role, active, created_at, upda
 
 const getUserByIdQuery: string = `SELECT * FROM users WHERE id = $1;`;
 
-const getUserByEmailQuery: string = `SELECT * FROM users WHERE email = $1;`;
+const getUserByEmailQuery: string = `SELECT * FROM users WHERE lower(email) = lower($1);`;
 
 const getUserByUsernameQuery: string = `SELECT * FROM users WHERE username = $1;`;
+
+const getAdminEmailsQuery: string = `
+SELECT DISTINCT email
+FROM users
+WHERE role = 'ADMIN' AND active AND email IS NOT NULL
+ORDER BY email;
+`;
 
 const createUserQuery: string = `
 INSERT INTO users (id, username, password_hash, email, role)
@@ -625,6 +632,7 @@ export const QUERIES = {
         USER_BY_ID: getUserByIdQuery,
         USER_BY_EMAIL: getUserByEmailQuery,
         USER_BY_USERNAME: getUserByUsernameQuery,
+        ADMIN_EMAILS: getAdminEmailsQuery,
         BUSINESS_BY_ID: getBusinessByIdQuery,
         BUSINESS_ID: getBusinessIdQuery,
         BUSINESS_KEY_HASH: getBusinessKeyHashQuery,

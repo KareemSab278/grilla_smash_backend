@@ -11,6 +11,14 @@ import { hashKey, keysMatch } from "../src/keys";
 import { hashPassword, verifyPassword } from "../src/passwords";
 import { consumeResetCode, discardResetCode, issueResetCode, RESET_WINDOW_MS } from "../src/passwordResets";
 import {
+    ADMIN_CREATION_CODE_WINDOW_MS,
+    consumeAdminCreationCode,
+    discardAdminCreationCode,
+    issueAdminCreationCode,
+} from "../src/adminCreationCodes";
+import {
+    adminCreateSchema,
+    adminCreationCodeRequestSchema,
     userCreateSchema,
     userLoginSchema,
     userPasswordResetLegacySchema,
@@ -77,11 +85,57 @@ test("codes are tracked per user", () => {
     assert.equal(consumeResetCode("b", codeA, start), false);
 });
 
+test("admin creation codes expire, bind to the requested identity and are single use", () => {
+    const start = 5_000_000;
+    const code = issueAdminCreationCode("admin_user", "admin@example.com", start);
+
+    assert.match(code, /^\d{6}$/);
+    assert.equal(consumeAdminCreationCode("different_user", "admin@example.com", code, start), false);
+    assert.equal(consumeAdminCreationCode("admin_user", "different@example.com", code, start), false);
+    assert.equal(consumeAdminCreationCode("admin_user", "admin@example.com", code, start + ADMIN_CREATION_CODE_WINDOW_MS), false);
+
+    const nextCode = issueAdminCreationCode("admin_user", "admin@example.com", start + ADMIN_CREATION_CODE_WINDOW_MS);
+    assert.equal(consumeAdminCreationCode("admin_user", "admin@example.com", nextCode, start + ADMIN_CREATION_CODE_WINDOW_MS), true);
+    assert.equal(consumeAdminCreationCode("admin_user", "admin@example.com", nextCode, start + ADMIN_CREATION_CODE_WINDOW_MS), false);
+    discardAdminCreationCode("admin_user", "admin@example.com");
+});
+
+test("admin creation codes are rate limited and expire after five incorrect attempts", () => {
+    const start = 6_000_000;
+    const code = issueAdminCreationCode("admin_user_2", "admin2@example.com", start);
+    const wrong = code === "000000" ? "000001" : "000000";
+
+    assert.throws(
+        () => issueAdminCreationCode("admin_user_2", "admin2@example.com", start + 1000),
+        { status: 429 }
+    );
+    for (let i = 0; i < 5; i++) {
+        assert.equal(consumeAdminCreationCode("admin_user_2", "admin2@example.com", wrong, start + i), false);
+    }
+    assert.equal(consumeAdminCreationCode("admin_user_2", "admin2@example.com", code, start + 10), false);
+});
+
 test("userCreateSchema trims the username and lowercases the email", () => {
     const parsed = userCreateSchema.parse({ username: "  joe  ", password: "longenough", email: "Jo@Example.COM" });
 
     assert.equal(parsed.username, "joe");
     assert.equal(parsed.email, "jo@example.com");
+});
+
+test("admin creation schemas validate request identity and verification code", () => {
+    const request = adminCreationCodeRequestSchema.parse({ username: "  new_admin ", email: "New@Example.COM" });
+    assert.deepEqual(request, { username: "new_admin", email: "new@example.com" });
+    assert.equal(adminCreationCodeRequestSchema.safeParse({ username: "ab", email: "invalid" }).success, false);
+
+    const valid = {
+        username: "new_admin",
+        password: "longenough",
+        email: "new@example.com",
+        verification_code: "123456",
+    };
+    assert.equal(adminCreateSchema.safeParse(valid).success, true);
+    assert.equal(adminCreateSchema.safeParse({ ...valid, verification_code: "12345" }).success, false);
+    assert.equal(adminCreateSchema.safeParse({ ...valid, email: "New@Example.COM" }).success, true);
 });
 
 test("userCreateSchema rejects short passwords, bad emails and short usernames", () => {
