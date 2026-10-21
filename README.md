@@ -125,8 +125,13 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `SHIFT4_SECRET_KEY` | no | none | Shift4 secret key. Required when `USE_STRIPE=false`; otherwise Shift4 is not used. |
 | `RESEND_API_KEY` | yes | none | Resend API key, used for order status emails and password reset codes. |
 | `EMAIL_FROM` | no | `test_business <grillasmash@gmail.com>` | Sender of every email, in `email@example.com` or `Name <email@example.com>` format. Configure a sender/domain verified with Resend for delivery; the default is for the current test setup. |
+| `SUPABASE_URL` | only for image storage | none | Supabase project URL used by the image storage service. |
+| `SUPABASE_SECRET_KEY` | only for image storage | none | Supabase secret/service-role key used by the backend to access Storage. Keep it private and never expose it to a browser. `SUPABASE_SERVICE_ROLE_KEY` is also accepted for older projects. |
+| `SUPABASE_IMAGE_BUCKET` | only for image storage | none | Name of the existing Supabase Storage bucket where images should be stored. |
 
-`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but **the backend does not use them yet**. They are for Supabase Auth, which is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
+Image storage is available through `Image` in [`src/imageUpload.ts`](./src/imageUpload.ts). It accepts image bytes and a MIME type, compresses them with Sharp to fit within 512 × 512 pixels without changing the aspect ratio or enlarging smaller images, stores uploads under generated names, and supports listing, replacing, and deleting files. Uploads are limited to 5 MB and JPEG, PNG, WebP, AVIF, or GIF. The service counts all current objects in the configured bucket and prevents its own uploads and replacements from taking the bucket over 4,000,000,000 bytes (4 GB). All writes to this bucket must go through this service for the limit to hold; direct uploads outside the backend bypass the quota check. The returned public URL only works when the configured bucket allows public access; private buckets should serve images through an authenticated endpoint or signed URLs.
+
+`SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but are not used yet. Supabase Auth is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 
 `.env` is git-ignored. Never commit it, it contains secrets.
 

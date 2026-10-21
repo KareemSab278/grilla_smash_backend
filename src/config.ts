@@ -34,6 +34,9 @@ type Config = {
     readonly host: string;
     readonly databaseUrl: string;
     readonly dbPoolMax: number;
+    readonly supabaseUrl: string | undefined;
+    readonly supabaseSecretKey: string | undefined;
+    readonly imageBucketName: string | undefined;
     readonly corsOrigins: string[] | true;
     readonly branchSettingsAuthEnabled: boolean;
     readonly useStripe: boolean;
@@ -95,6 +98,9 @@ export const CONFIG: Config = {
     host: process.env.HOST || DEFAULT_HOST,
     databaseUrl: getDatabaseUrl(),
     dbPoolMax: parseInteger("DB_POOL_MAX", process.env.DB_POOL_MAX, DEFAULT_DB_POOL_MAX, 1, 100),
+    supabaseUrl: process.env.SUPABASE_URL || undefined,
+    supabaseSecretKey: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || undefined,
+    imageBucketName: process.env.SUPABASE_IMAGE_BUCKET || undefined,
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     branchSettingsAuthEnabled: parseBoolean(process.env.BRANCH_SETTINGS_AUTH_ENABLED, false),
     useStripe: parseBoolean(process.env.USE_STRIPE, true),
