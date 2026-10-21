@@ -129,7 +129,22 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `SUPABASE_SECRET_KEY` | only for image storage | none | Supabase secret/service-role key used by the backend to access Storage. Keep it private and never expose it to a browser. `SUPABASE_SERVICE_ROLE_KEY` is also accepted for older projects. |
 | `SUPABASE_IMAGE_BUCKET` | only for image storage | none | Name of the existing Supabase Storage bucket where images should be stored. |
 
-Image storage is available through `Image` in [`src/imageUpload.ts`](./src/imageUpload.ts). It accepts image bytes and a MIME type, compresses them with Sharp to fit within 512 × 512 pixels without changing the aspect ratio or enlarging smaller images, stores uploads under generated names, and supports listing, replacing, and deleting files. Uploads are limited to 5 MB and JPEG, PNG, WebP, AVIF, or GIF. The service counts all current objects in the configured bucket and prevents its own uploads and replacements from taking the bucket over 4,000,000,000 bytes (4 GB). All writes to this bucket must go through this service for the limit to hold; direct uploads outside the backend bypass the quota check. The returned public URL only works when the configured bucket allows public access; private buckets should serve images through an authenticated endpoint or signed URLs.
+Image storage is available through `Images` in [`src/imageUpload.ts`](./src/imageUpload.ts). It accepts image bytes and a MIME type, compresses them with Sharp to fit within 512 × 512 pixels without changing the aspect ratio or enlarging smaller images, stores uploads under generated names, and supports listing, replacing, and deleting files. Uploads are limited to 5 MB and JPEG, PNG, WebP, AVIF, or GIF. The service counts all current objects in the configured bucket and prevents its own uploads and replacements from taking the bucket over 4,000,000,000 bytes (4 GB). All writes to this bucket must go through this service for the limit to hold; direct uploads outside the backend bypass the quota check. The returned public URL only works when the configured bucket allows public access; private buckets should serve images through an authenticated endpoint or signed URLs.
+
+### Uploading an image from the admin panel
+
+`POST /images` accepts `multipart/form-data` with a file field named `image` and an optional text field named `folder`. It returns the `image_url` and Storage `path`:
+
+```sh
+curl -X POST http://localhost:8000/images \
+  -H "Authorization: Bearer <admin-user-id>" \
+  -F "image=@./product.png" \
+  -F "folder=products"
+```
+
+The endpoint is disabled unless `BRANCH_SETTINGS_AUTH_ENABLED=true`; it then uses the branch-manager authorization guard. The current guard accepts a user ID as a bearer token, not a Supabase Auth JWT.
+
+The database already has an `image_url` column on products and categories, so no migration is needed. Save the returned `image_url` when creating or updating the product/category (for example, send `{ "image_url": "<returned image_url>" }` to `PUT /products/:productId`). Keep the returned `path` instead if the bucket is private and you plan to serve images with signed URLs.
 
 `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but are not used yet. Supabase Auth is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 

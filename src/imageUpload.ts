@@ -17,6 +17,7 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { CONFIG } from "./config";
 import { dbRun, transaction, type Db } from "./db";
+import { badRequest, conflict } from "./errors";
 
 const toMB = (bytes: number) => bytes / (1024 * 1024);
 
@@ -24,7 +25,7 @@ const SUPABASE_URL = CONFIG.supabaseUrl;
 const SUPABASE_SECRET_KEY = CONFIG.supabaseSecretKey;
 const SUPABASE_IMAGE_BUCKET = CONFIG.imageBucketName;
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_IMAGE_DIMENSION = 512;
 const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_BUCKET_SIZE_BYTES = 4_000_000_000; // 4 gb cap
@@ -70,7 +71,11 @@ const compressImage = async (data: Uint8Array, contentType: string): Promise<Uin
             break;
     }
 
-    return image.toBuffer();
+    try {
+        return await image.toBuffer();
+    } catch {
+        throw badRequest("The uploaded file could not be decoded or compressed as an image");
+    }
 };
 
 
@@ -182,18 +187,18 @@ const getBucketUsage = async (
 
 const validateImage = (input: UploadImageInput): string => {
     if (!(input.data instanceof Uint8Array) || input.data.byteLength === 0) {
-        throw new Error("Image data must be a non-empty Uint8Array");
+        throw badRequest("Image data must be a non-empty Uint8Array");
     }
     if (input.data.byteLength > MAX_IMAGE_SIZE_BYTES) {
-        throw new Error(`Image exceeds the ${toMB(MAX_IMAGE_SIZE_BYTES)} MB size limit`);
+        throw badRequest(`Image exceeds the ${toMB(MAX_IMAGE_SIZE_BYTES)} MB size limit`);
     }
 
     const extension = IMAGE_EXTENSIONS[input.contentType];
     if (!extension) {
-        throw new Error(`Unsupported image content type: ${input.contentType}`);
+        throw badRequest(`Unsupported image content type: ${input.contentType}`);
     }
     if (!matchesContentType(input.data, input.contentType)) {
-        throw new Error(`Image data does not match content type: ${input.contentType}`);
+        throw badRequest(`Image data does not match content type: ${input.contentType}`);
     }
 
     return extension;
@@ -204,7 +209,7 @@ const validateFolder = (folder: string | undefined): string => {
 
     const segments = folder.split("/");
     if (segments.some(segment => !/^[a-zA-Z0-9_-]+$/.test(segment))) {
-        throw new Error("Image folder may only contain letters, numbers, underscores, and hyphens");
+        throw badRequest("Image folder may only contain letters, numbers, underscores, and hyphens");
     }
 
     return segments.join("/");
@@ -216,7 +221,7 @@ const validatePath = (path: string): void => {
         path.startsWith("/") ||
         path.split("/").some(segment => !/^[a-zA-Z0-9_.-]+$/.test(segment) || segment === "." || segment === "..")
     ) {
-        throw new Error("Image path must be a relative path inside the configured bucket");
+        throw badRequest("Image path must be a relative path inside the configured bucket");
     }
 };
 
@@ -229,7 +234,7 @@ const store = async (path: string, input: UploadImageInput, upsert: boolean): Pr
         const { usedBytes, targetPathBytes } = await getBucketUsage(storage, upsert ? path : undefined);
         const projectedBytes = usedBytes - targetPathBytes + compressedImage.byteLength;
         if (projectedBytes > MAX_BUCKET_SIZE_BYTES) {
-            throw new Error("Image storage quota exceeded: uploads may not use more than 4 GB");
+            throw conflict("Image storage quota exceeded: uploads may not use more than 4 GB");
         }
 
         const { data, error } = await storage.upload(path, compressedImage, {
