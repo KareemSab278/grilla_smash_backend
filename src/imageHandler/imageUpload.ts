@@ -9,6 +9,20 @@
     serializes quota mutations and enforces the total application bucket budget
 */
 
+
+/*
+
+    -- Allow image uploads policy for the images bucket - must run in sql editor
+
+    CREATE POLICY "Allow image uploads"
+    ON storage.objects
+    FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (
+        bucket_id = 'images'
+    );
+*/
+
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { CONFIG } from "../config";
