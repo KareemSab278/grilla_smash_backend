@@ -20,6 +20,8 @@ const BUSINESS_COLUMNS = "id, name, slug, logo_url, currency, active, created_at
 
 const getBusinessQuery: string = `SELECT ${BUSINESS_COLUMNS} FROM business LIMIT 1;`;
 
+const getBranchLocationsQuery: string = `SELECT * FROM branches where active = true`;
+
 const getBusinessByIdQuery: string = `SELECT ${BUSINESS_COLUMNS} FROM business WHERE id = $1;`;
 
 const getBusinessIdQuery: string = `SELECT id FROM business LIMIT 1;`;
@@ -635,6 +637,7 @@ RETURNING id, status;
 export const QUERIES = {
     GET: {
         BUSINESS: getBusinessQuery,
+        BRANCH_LOCATIONS: getBranchLocationsQuery,
         USER_BY_ID: getUserByIdQuery,
         USER_BY_EMAIL: getUserByEmailQuery,
         USER_BY_USERNAME: getUserByUsernameQuery,

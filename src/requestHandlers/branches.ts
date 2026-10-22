@@ -3,6 +3,7 @@
 
     GET    /branches            all branches, by name
     GET    /branches/:branchId
+    GET    /branch-locations     all branch locations
     POST   /branches
     PUT    /branches/:branchId  partial update
     PATCH  /branches/:branchId/opening-hours
@@ -28,6 +29,7 @@ const router = express.Router();
 router.get("/branches", async (req, res) => await listBranches(req, res));
 router.get("/branches/:branchId", async (req, res) => await getBranch(req, res));
 router.post("/branches", async (req, res) => await createBranch(req, res));
+router.get("/branch-locations", async (req, res) => await listBranchLocations(req, res));
 router.put("/branches/:branchId", async (req, res) => await updateBranch(req, res));
 router.patch("/branches/:branchId/opening-hours", async (req, res) => await updateOpeningHours(req, res));
 router.put(
@@ -99,6 +101,10 @@ const updateBranch = async (req: Request<BranchParams>, res: Response<BranchRow>
     ]);
 
     res.json(requireRow(updated, "branch"));
+};
+
+const listBranchLocations = async (_req: Request, res: Response<BranchRow[]>): Promise<void> => {
+    res.json(await dbAll<BranchRow>(sql, QUERIES.GET.BRANCH_LOCATIONS));
 };
 
 // ========================================
