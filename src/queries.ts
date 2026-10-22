@@ -163,6 +163,9 @@ RETURNING *;
 const getCategoriesQuery: string = `SELECT * FROM categories ORDER BY sort_order, name;`;
 
 const getCategoryByIdQuery: string = `SELECT * FROM categories WHERE id = $1;`;
+const lockCategoryImageQuery: string = `SELECT image_url FROM categories WHERE id = $1 FOR UPDATE;`;
+const setCategoryImageQuery: string = `UPDATE categories SET image_url = $1 WHERE id = $2 RETURNING image_url;`;
+const clearCategoryImageReferencesQuery: string = `UPDATE categories SET image_url = NULL WHERE image_url = $1 RETURNING id;`;
 
 const createCategoryQuery: string = `
 INSERT INTO categories (id, name, description, image_url, sort_order)
@@ -193,6 +196,9 @@ const getProductsQuery: string = `SELECT * FROM products ORDER BY sort_order, na
 const getActiveProductsQuery: string = `SELECT * FROM products WHERE active ORDER BY sort_order, name;`;
 
 const getProductByIdQuery: string = `SELECT * FROM products WHERE id = $1;`;
+const lockProductImageQuery: string = `SELECT image_url FROM products WHERE id = $1 FOR UPDATE;`;
+const setProductImageQuery: string = `UPDATE products SET image_url = $1 WHERE id = $2 RETURNING image_url;`;
+const clearProductImageReferencesQuery: string = `UPDATE products SET image_url = NULL WHERE image_url = $1 RETURNING id;`;
 
 const getProductCategoriesQuery: string = `
 SELECT c.*, pc.product_id
@@ -643,10 +649,12 @@ export const QUERIES = {
 
         CATEGORIES: getCategoriesQuery,
         CATEGORY_BY_ID: getCategoryByIdQuery,
+        CATEGORY_IMAGE_FOR_UPDATE: lockCategoryImageQuery,
 
         PRODUCTS: getProductsQuery,
         ACTIVE_PRODUCTS: getActiveProductsQuery,
         PRODUCT_BY_ID: getProductByIdQuery,
+        PRODUCT_IMAGE_FOR_UPDATE: lockProductImageQuery,
         PRODUCT_CATEGORIES: getProductCategoriesQuery,
         PRODUCT_MODIFIER_GROUPS: getProductModifierGroupsQuery,
         PRODUCT_ACTIVE_MODIFIERS: getProductActiveModifiersQuery,
@@ -705,7 +713,11 @@ export const QUERIES = {
         BRANCH_OPENING_HOURS: updateBranchOpeningHoursQuery,
         BRANCH_UNAVAILABLE_PRODUCT: addBranchUnavailableProductQuery,
         CATEGORY: updateCategoryQuery,
+        CATEGORY_IMAGE: setCategoryImageQuery,
+        CLEAR_CATEGORY_IMAGE_REFERENCES: clearCategoryImageReferencesQuery,
         PRODUCT: updateProductQuery,
+        PRODUCT_IMAGE: setProductImageQuery,
+        CLEAR_PRODUCT_IMAGE_REFERENCES: clearProductImageReferencesQuery,
         MODIFIER_GROUP: updateModifierGroupQuery,
         MODIFIER: updateModifierQuery,
         OFFER: updateOfferQuery,

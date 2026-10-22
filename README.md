@@ -129,22 +129,27 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `SUPABASE_SECRET_KEY` | only for image storage | none | Supabase secret/service-role key used by the backend to access Storage. Keep it private and never expose it to a browser. `SUPABASE_SERVICE_ROLE_KEY` is also accepted for older projects. |
 | `SUPABASE_IMAGE_BUCKET` | only for image storage | none | Name of the existing Supabase Storage bucket where images should be stored. |
 
-Image storage is available through `Images` in [`src/imageUpload.ts`](./src/imageUpload.ts). It accepts image bytes and a MIME type, compresses them with Sharp to fit within 512 × 512 pixels without changing the aspect ratio or enlarging smaller images, stores uploads under generated names, and supports listing, replacing, and deleting files. Uploads are limited to 5 MB and JPEG, PNG, WebP, AVIF, or GIF. The service counts all current objects in the configured bucket and prevents its own uploads and replacements from taking the bucket over 4,000,000,000 bytes (4 GB). All writes to this bucket must go through this service for the limit to hold; direct uploads outside the backend bypass the quota check. The returned public URL only works when the configured bucket allows public access; private buckets should serve images through an authenticated endpoint or signed URLs.
+Image storage is available through `Images` in [`src/imageHandler/imageUpload.ts`](./src/imageHandler/imageUpload.ts). It accepts original files up to 10 MB, identifies and decodes their actual content with Sharp (not the filename or submitted MIME type), and converts supported JPEG, PNG, HEIC/HEIF, WebP, AVIF, and GIF images to WebP. HEIC/HEIF decoding depends on the deployed Sharp/libvips codecs. Animated or multi-page images are rejected. The output preserves aspect ratio, is never enlarged, fits within 512 × 512 pixels, and must be at most 80 KiB; WebP is tried at quality 80, 75, 70, 65, 60, and 55 before dimensions are reduced to a 256-pixel lower bound. Uploads that still exceed 80 KiB are rejected.
+
+The application enforces a **5 MiB total bucket budget** (enough for 50 images at 80 KiB each, with about 1 MiB of headroom). Before each upload or replacement it lists actual bucket usage and applies replacement/deletion accounting under a Postgres advisory lock shared across backend instances; writes in one process are also serialized. Supabase's bucket `file_size_limit` setting is a per-file limit, not a cumulative bucket limit. The service checks that the configured bucket is public, permits `image/webp`, and allows individual files of at least 80 KiB; set both the bucket and project-wide per-file limits to at least 81,920 bytes. The 5 MiB cumulative limit is enforced by this application, not by the bucket configuration or Supabase project quota. Ensure the Supabase project has enough storage available, and route every bucket write through this service: direct or concurrent external writes bypass the application lock and can exceed the application budget. Private bucket signed-URL delivery is not implemented by the current product/category `image_url` model.
 
 ### Uploading an image from the admin panel
 
-`POST /images` accepts `multipart/form-data` with a file field named `image` and an optional text field named `folder`. It returns the `image_url` and Storage `path`:
+`POST /images` accepts `multipart/form-data` with a file field named `image`, exactly one of `product_id` or `category_id`, and an optional text field named `folder`. It updates that existing record's `image_url` in the same request. Create a product/category first without an image, then upload and associate its image. If the database update fails, the new WebP is removed; after a successful replacement, the previous image in this bucket is removed. The endpoint returns the `image_url`, Storage `path`, and associated entity:
+
+`GET /images` returns the bucket's recursively listed files, their paths, public URLs, byte sizes, content types, and timestamps, alongside `used_bytes` and the 5 MiB `limit_bytes`. It uses the same branch-manager authorization as image uploads; the admin panel matches public URLs against product and category records to show associated IDs. `DELETE /images/file` accepts a JSON body with the image `path`, clears any matching product/category references, and deletes the file from Storage. Configure `BRANCH_SETTINGS_AUTH_ENABLED=true` to use these endpoints outside local development.
 
 ```sh
 curl -X POST http://localhost:8000/images \
   -H "Authorization: Bearer <admin-user-id>" \
   -F "image=@./product.png" \
+  -F "product_id=<existing-product-id>" \
   -F "folder=products"
 ```
 
-The endpoint is disabled unless `BRANCH_SETTINGS_AUTH_ENABLED=true`; it then uses the branch-manager authorization guard. The current guard accepts a user ID as a bearer token, not a Supabase Auth JWT.
+Use `category_id=<existing-category-id>` instead for a category image. The endpoint is disabled unless `BRANCH_SETTINGS_AUTH_ENABLED=true`; it then uses the branch-manager authorization guard. The current guard accepts a user ID as a bearer token, not a Supabase Auth JWT.
 
-The database already has an `image_url` column on products and categories, so no migration is needed. Save the returned `image_url` when creating or updating the product/category (for example, send `{ "image_url": "<returned image_url>" }` to `PUT /products/:productId`). Keep the returned `path` instead if the bucket is private and you plan to serve images with signed URLs.
+The database already has an `image_url` column on products and categories, so no migration is needed. Send `DELETE /images/product/<id>` or `DELETE /images/category/<id>` to clear the database reference and remove its managed image. The direct `image_url` fields on product/category create and update endpoints remain available for external image URLs; use `/images` for managed bucket images so replacement, deletion, and quota accounting stay coordinated.
 
 `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_JWKS_URL` may be present in `.env` but are not used yet. Supabase Auth is not wired in (see [section 12](#12-known-limitations-and-roadmap)). `@supabase/server` is installed for that purpose.
 
@@ -726,6 +731,17 @@ Stripe is the default provider. Set `USE_STRIPE=false` to use Shift4 instead (50
 | POST | `/payments/checkout-callback` | Stripe body: `paymentIntentId`; Shift4 body: `shift4ChargeId`. Retrieves the payment status from the selected provider |
 
 Success responses are `{ success, charge_id, amount, currency, status }` where `status` is `200` when paid and `402` when not.
+
+### 8.16 Images
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/images` | Lists all bucket files recursively with `path`, `image_url`, `size_bytes`, `content_type`, `created_at`, and `updated_at`, plus actual `used_bytes` and the application `limit_bytes` (5 MiB) |
+| POST | `/images` | Uploads and associates a converted WebP with one existing product or category |
+| DELETE | `/images/file` | JSON `{ "path": "<bucket-relative-path>" }`; clears matching product/category references and deletes the file |
+| DELETE | `/images/:entityType/:entityId` | Clears one product/category image and removes its managed bucket file |
+
+All image routes require `BRANCH_SETTINGS_AUTH_ENABLED=true` and an active ADMIN or MANAGER user. Bucket usage is the total of the file sizes returned by Supabase Storage; external writes can bypass the application's quota lock.
 
 ---
 
