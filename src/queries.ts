@@ -141,6 +141,13 @@ WHERE id = $1
 RETURNING *;
 `;
 
+const updateBranchUnavailableProductsQuery: string = `
+UPDATE branches
+SET unavailable_products = $2::text[]
+WHERE id = $1
+RETURNING *;
+`;
+
 const addBranchUnavailableProductQuery: string = `
 UPDATE branches
 SET unavailable_products = CASE
@@ -198,6 +205,7 @@ const getProductsQuery: string = `SELECT * FROM products ORDER BY sort_order, na
 const getActiveProductsQuery: string = `SELECT * FROM products WHERE active ORDER BY sort_order, name;`;
 
 const getProductByIdQuery: string = `SELECT * FROM products WHERE id = $1;`;
+const getProductIdsQuery: string = `SELECT id FROM products WHERE id = ANY($1::text[]);`;
 const lockProductImageQuery: string = `SELECT image_url FROM products WHERE id = $1 FOR UPDATE;`;
 const setProductImageQuery: string = `UPDATE products SET image_url = $1 WHERE id = $2 RETURNING image_url;`;
 const clearProductImageReferencesQuery: string = `UPDATE products SET image_url = NULL WHERE image_url = $1 RETURNING id;`;
@@ -352,7 +360,6 @@ LEFT JOIN branch_product_overrides bpo
     ON bpo.product_id = p.id
     AND bpo.branch_id = $1
 WHERE p.active
-  AND (bpo.active IS NULL OR bpo.active)
   AND NOT (p.id = ANY(b.unavailable_products))
 ORDER BY p.sort_order, p.name;
 `;
@@ -657,6 +664,7 @@ export const QUERIES = {
         PRODUCTS: getProductsQuery,
         ACTIVE_PRODUCTS: getActiveProductsQuery,
         PRODUCT_BY_ID: getProductByIdQuery,
+        PRODUCT_IDS: getProductIdsQuery,
         PRODUCT_IMAGE_FOR_UPDATE: lockProductImageQuery,
         PRODUCT_CATEGORIES: getProductCategoriesQuery,
         PRODUCT_MODIFIER_GROUPS: getProductModifierGroupsQuery,
@@ -714,6 +722,7 @@ export const QUERIES = {
         USER_PASSWORD: updateUserPasswordQuery,
         BRANCH: updateBranchQuery,
         BRANCH_OPENING_HOURS: updateBranchOpeningHoursQuery,
+        BRANCH_UNAVAILABLE_PRODUCTS: updateBranchUnavailableProductsQuery,
         BRANCH_UNAVAILABLE_PRODUCT: addBranchUnavailableProductQuery,
         CATEGORY: updateCategoryQuery,
         CATEGORY_IMAGE: setCategoryImageQuery,

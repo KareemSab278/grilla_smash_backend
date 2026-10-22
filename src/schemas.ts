@@ -160,6 +160,10 @@ export const branchUpdateSchema = z.object({
     active: z.boolean().nullish(),
 });
 
+export const branchUnavailableProductsSchema = z.object({
+    unavailable_products: z.array(id),
+});
+
 // ========================================
 // CATEGORIES
 // ========================================

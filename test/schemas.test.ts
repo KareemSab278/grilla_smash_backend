@@ -9,6 +9,7 @@ import test from "node:test";
 
 import {
     businessCreateSchema,
+    branchUnavailableProductsSchema,
     openingHoursPatchSchema,
     openingHoursSchema,
     offerCreateSchema,
@@ -71,6 +72,16 @@ test("productListQuerySchema accepts boolean-like query values", () => {
     assert.equal(productListQuerySchema.parse({}).active_only, false);
     assert.equal(productListQuerySchema.parse({ active_only: "true" }).active_only, true);
     assert.equal(productListQuerySchema.parse({ active_only: "0" }).active_only, false);
+});
+
+test("branchUnavailableProductsSchema accepts empty and populated product lists", () => {
+    assert.deepEqual(branchUnavailableProductsSchema.parse({ unavailable_products: [] }), { unavailable_products: [] });
+    assert.deepEqual(
+        branchUnavailableProductsSchema.parse({ unavailable_products: ["p1", "p2"] }),
+        { unavailable_products: ["p1", "p2"] }
+    );
+    assert.throws(() => branchUnavailableProductsSchema.parse({ unavailable_products: [""] }));
+    assert.throws(() => branchUnavailableProductsSchema.parse({}));
 });
 
 test("offerCreateSchema rejects invalid dates and accepts valid ones", () => {

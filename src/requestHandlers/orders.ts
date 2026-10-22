@@ -202,7 +202,7 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
         const product = productsById.get(item.product_id);
         if (!product) throw notFound(`product ${item.product_id} not found`);
 
-        if (!product.active || product.branch_active === false || product.branch_unavailable) {
+        if (!product.active || product.branch_unavailable) {
             throw badRequest(`'${product.name}' is not available at this branch`);
         }
 

@@ -146,6 +146,26 @@ test("branch price overrides are used", () => {
     assert.equal(priced.discount, 0); // 600 + 300 < 1000, never negative
 });
 
+test("branch unavailable IDs control availability while global inactivity still blocks a product", () => {
+    const branchOverrideDisabled = new Map(products).set(
+        "burger",
+        product("burger", 800, { branch_active: false }),
+    );
+    assert.doesNotThrow(() => priceBundle(makeOffer(), bundle(), branchOverrideDisabled, now));
+
+    const branchUnavailable = new Map(products).set(
+        "burger",
+        product("burger", 800, { branch_unavailable: true }),
+    );
+    assert.throws(() => priceBundle(makeOffer(), bundle(), branchUnavailable, now), /not available at this branch/);
+
+    const globallyInactive = new Map(products).set(
+        "burger",
+        product("burger", 800, { active: false }),
+    );
+    assert.throws(() => priceBundle(makeOffer(), bundle(), globallyInactive, now), /not available at this branch/);
+});
+
 test("rejects inactive, expired and unstarted offers", () => {
     assert.throws(() => priceBundle(makeOffer({ active: false }), bundle(), products, now), /not available/);
     assert.throws(() => priceBundle(makeOffer({ ends_at: new Date("2026-02-01T00:00:00Z") }), bundle(), products, now), /ended/);

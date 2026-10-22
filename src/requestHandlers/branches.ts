@@ -7,6 +7,7 @@
     POST   /branches
     PUT    /branches/:branchId  partial update
     PATCH  /branches/:branchId/opening-hours
+    PUT    /branches/:branchId/unavailable-products
     PUT    /branches/:branchId/unavailable-products/:productId
     DELETE /branches/:branchId/unavailable-products/:productId
     DELETE /branches/:branchId  409 while the branch still has orders
@@ -16,13 +17,20 @@ import express from "express";
 import type { Request, Response } from "express";
 import { QUERIES } from "../queries";
 import sql, { dbAll, dbGet } from "../db";
-import { deleteById, getRequiredRow, newId, orNull, requireRow } from "../helpers";
+import { deleteById, getRequiredRow, newId, orNull, requireRow, unique } from "../helpers";
 import { parseInput } from "../middleware/validate";
 import { requireBranchManager } from "../middleware/requireBranchManager";
-import { branchCreateSchema, branchUpdateSchema, openingHoursPatchSchema, openingHoursSchema } from "../schemas";
+import {
+    branchCreateSchema,
+    branchUnavailableProductsSchema,
+    branchUpdateSchema,
+    openingHoursPatchSchema,
+    openingHoursSchema,
+} from "../schemas";
 import { mergeOpeningHours } from "../branchHours";
 import type { BranchRow, DeleteResponse } from "../types";
 import type { ProductRow } from "../types";
+import { notFound } from "../errors";
 
 const router = express.Router();
 
@@ -32,6 +40,7 @@ router.post("/branches", async (req, res) => await createBranch(req, res));
 router.get("/branch-locations", async (req, res) => await listBranchLocations(req, res));
 router.put("/branches/:branchId", async (req, res) => await updateBranch(req, res));
 router.patch("/branches/:branchId/opening-hours", async (req, res) => await updateOpeningHours(req, res));
+router.put("/branches/:branchId/unavailable-products", async (req, res) => await updateUnavailableProducts(req, res));
 router.put(
     "/branches/:branchId/unavailable-products/:productId",
     async (req, res) => await markProductUnavailable(req, res)
@@ -121,6 +130,26 @@ const updateOpeningHours = async (req: Request<BranchParams>, res: Response<Bran
         req.params.branchId,
         JSON.stringify(validated),
     ]);
+
+    res.json(requireRow(updated, "branch"));
+};
+
+// ========================================
+
+const updateUnavailableProducts = async (req: Request<BranchParams>, res: Response<BranchRow>): Promise<void> => {
+    await requireBranchManager(req);
+    const { unavailable_products } = parseInput(branchUnavailableProductsSchema, req.body);
+    const branchId = req.params.branchId;
+
+    await getRequiredRow<BranchRow>(sql, QUERIES.GET.BRANCH_BY_ID, branchId, "branch");
+
+    const productIds = unique(unavailable_products);
+    if (productIds.length > 0) {
+        const products = await dbAll<Pick<ProductRow, "id">>(sql, QUERIES.GET.PRODUCT_IDS, [productIds]);
+        if (products.length !== productIds.length) throw notFound("One or more products not found");
+    }
+
+    const updated = await dbGet<BranchRow>(sql, QUERIES.PUT.BRANCH_UNAVAILABLE_PRODUCTS, [branchId, productIds]);
 
     res.json(requireRow(updated, "branch"));
 };

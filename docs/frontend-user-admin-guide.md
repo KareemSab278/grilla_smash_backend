@@ -153,6 +153,77 @@ Password reset routes also do not require the business key:
 
 Reset codes have the same five-minute lifetime and five-attempt limit as admin-creation codes.
 
+## Updating unavailable products for a branch
+
+Use this endpoint when saving the full set of products that should be unavailable at a branch:
+
+```http
+PUT /branches/:branchId/unavailable-products
+Content-Type: application/json
+Authorization: Bearer <user-id>
+```
+
+The authorization header is only required when `BRANCH_SETTINGS_AUTH_ENABLED=true`; the current
+branch-settings guard expects the logged-in user's ID as the bearer value. Do not send the business
+key for this endpoint.
+
+Send the complete list of unavailable product IDs, not only the IDs changed in the UI:
+
+```json
+{
+  "unavailable_products": ["product-id-1", "product-id-2"]
+}
+```
+
+An empty array clears the branch's unavailable list:
+
+```json
+{
+  "unavailable_products": []
+}
+```
+
+Example frontend helper:
+
+```ts
+type Branch = {
+  id: string;
+  unavailable_products: string[];
+  // Other branch fields are returned too.
+};
+
+async function saveUnavailableProducts(
+  apiBaseUrl: string,
+  branchId: string,
+  unavailableProductIds: string[],
+  userId?: string
+): Promise<Branch> {
+  const response = await fetch(
+    `${apiBaseUrl}/branches/${encodeURIComponent(branchId)}/unavailable-products`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(userId ? { Authorization: `Bearer ${userId}` } : {}),
+      },
+      body: JSON.stringify({ unavailable_products: unavailableProductIds }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail ?? `Unable to save branch availability (${response.status})`);
+  }
+
+  return response.json() as Promise<Branch>;
+}
+```
+
+On success (`200`), the response is the updated branch row; use its `unavailable_products` value to
+refresh local state. Product IDs must exist. Invalid input returns `422`; a missing branch or product
+returns `404`; enabled branch authorization can return `401` or `403`. Since this replaces the whole
+list, send the full current selection when saving and send `[]` only when the intent is to clear it.
+
 ## Frontend implementation notes
 
 - Keep the business key out of public/customer-facing bundles. It is a shared secret and is not a substitute for user authentication.

@@ -9,9 +9,11 @@
 import type { RequestHandler } from "express";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 
-const MAX_REQUESTS_PER_SECOND = 30;
-const MAX_REQUESTS_PER_MINUTE = 100;
-const BLOCK_DURATION_MS = 60_000;
+const dev = process.env.NODE_ENV === "development";
+
+const MAX_REQUESTS_PER_SECOND = 30 * (dev ? 10 : 1);
+const MAX_REQUESTS_PER_MINUTE = 100 * (dev ? 10 : 1);
+const BLOCK_DURATION_MS = dev ? 6_000 : 60_000;
 const SHARED_KEY = "all-requests";
 
 type RateLimiterLike = Pick<RateLimiterMemory, "consume">;

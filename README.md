@@ -363,6 +363,7 @@ curl -X POST localhost:8000/business -H 'Content-Type: application/json' \
 | POST | `/branches` | Create |
 | PUT | `/branches/:branchId` | Partial update |
 | PATCH | `/branches/:branchId/opening-hours` | Partial weekly schedule update |
+| PUT | `/branches/:branchId/unavailable-products` | Replace the branch's unavailable product list |
 | PUT | `/branches/:branchId/unavailable-products/:productId` | Mark a product unavailable at one branch |
 | DELETE | `/branches/:branchId/unavailable-products/:productId` | Restore product availability at one branch |
 | DELETE | `/branches/:branchId` | Delete. 409 if the branch has orders |
@@ -384,6 +385,8 @@ Body fields: `name`\*, `address_line1`\*, `city`\*, `postcode`\*, `address_line2
 ```
 
 PATCH `/branches/:branchId/opening-hours` accepts only the days you want to change. For example, sending only `monday` updates Monday and leaves the other six days unchanged. A closed day can be represented with `{ "is_closed": true }`.
+
+PUT `/branches/:branchId/unavailable-products` accepts `{ "unavailable_products": ["<productId>"] }` and replaces the full list. Send an empty array to clear it; every product id must exist.
 
 ### 8.5 Categories
 
