@@ -16,6 +16,10 @@ const router = express.Router();
 router.post("/payments/charge", async (req, res) => await handleCharge(req, res));
 router.get("/payments/checkout-session", async (req, res) => await getCheckoutSession(req, res));
 router.post("/payments/checkout-callback", async (req, res) => await getCheckoutCallback(req, res));
+router.post("/payments/stripe/charge", async (req, res) => await handleStripeCharge(req, res));
+router.get("/payments/stripe/checkout-session", async (req, res) => await getStripeCheckoutSession(req, res));
+router.get("/payments/stripe-checkout-session", async (req, res) => await getStripeCheckoutSession(req, res));
+router.post("/payments/stripe/checkout-callback", async (req, res) => await getStripeCheckoutCallback(req, res));
 
 // ========================================
 
@@ -184,11 +188,26 @@ const buildChargeParams = ({ amount, currency, token, card, customerId }: Record
 const getStripeCheckoutCallback = async (req: Request, res: Response) => {
     try {
         const body = req.body ?? {};
+        const sessionId = body.stripeSessionId || body.sessionId;
         const paymentIntentId =
-            body.paymentIntentId || body.stripePaymentIntentId || body.paymentId || body.id;
+            body.paymentIntentId || body.stripePaymentIntentId || body.paymentId ||
+            (typeof body.id === "string" && body.id.startsWith("pi_") ? body.id : undefined);
+
+        if (sessionId || (typeof body.id === "string" && body.id.startsWith("cs_"))) {
+            const session = await stripe.checkout.sessions.retrieve(sessionId || body.id);
+            const response: healthyResponse = {
+                success: true,
+                charge_id: session.id,
+                amount: session.amount_total ?? undefined,
+                currency: session.currency ?? undefined,
+                status: session.payment_status === "paid" ? 200 : 402,
+            };
+
+            return res.json(response);
+        }
 
         if (!paymentIntentId) {
-            return res.status(400).json({ success: false, error: "Missing paymentIntentId" });
+            return res.status(400).json({ success: false, error: "Missing paymentIntentId or stripeSessionId" });
         }
 
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);

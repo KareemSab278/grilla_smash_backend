@@ -732,6 +732,9 @@ Stripe is the default provider. Set `USE_STRIPE=false` to use Shift4 instead (50
 | GET | `/payments/checkout-session?amount=&currency=` | Stripe creates a PaymentIntent and returns `{ success, clientSecret }`; Shift4 returns a signed checkout request |
 | POST | `/payments/charge` | Stripe body: `amount`, `currency`, `paymentMethodId`; Shift4 body: `amount`, `currency`, and `token` or `card` |
 | POST | `/payments/checkout-callback` | Stripe body: `paymentIntentId`; Shift4 body: `shift4ChargeId`. Retrieves the payment status from the selected provider |
+| POST | `/payments/stripe/charge` | Stripe-only charge; body: `amount`, `currency`, `paymentMethodId` |
+| GET | `/payments/stripe/checkout-session` or `/payments/stripe-checkout-session` | Stripe-only PaymentIntent creation; returns `{ success, clientSecret }` |
+| POST | `/payments/stripe/checkout-callback` | Stripe-only status lookup; accepts a `paymentIntentId` or `stripeSessionId` |
 
 Success responses are `{ success, charge_id, amount, currency, status }` where `status` is `200` when paid and `402` when not.
 
