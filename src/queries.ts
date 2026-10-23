@@ -630,8 +630,8 @@ VALUES ($1, $2, $3, $4, $5, 1);
 `;
 
 const createPaymentQuery: string = `
-INSERT INTO payments (id, order_id, provider, provider_payment_id, amount, status)
-VALUES ($1, $2, $3, $4, $5, 'PENDING');
+INSERT INTO payments (id, order_id, provider, provider_payment_id, amount, currency, status)
+VALUES ($1, $2, $3, $4, $5, $6, 'PENDING');
 `;
 
 const updateOrderStatusQuery: string = `

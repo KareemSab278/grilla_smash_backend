@@ -50,6 +50,28 @@ const errorResponse = (res: Response, error: string, err: unknown) => {
     return res.status(status).json(body);
 };
 
+const stripeLog = (event: string, details: Record<string, unknown>): void => {
+    if (process.env.NODE_ENV !== "development") return;
+    console.info(`[stripe] ${event}`, details);
+};
+
+const stripeErrorDetails = (err: unknown): Record<string, unknown> => {
+    const details: Record<string, unknown> = {
+        message: err instanceof Error ? err.message : String(err),
+    };
+    if (err instanceof Error) details.name = err.name;
+
+    if (err !== null && typeof err === "object") {
+        const metadata = err as Record<string, unknown>;
+        for (const key of ["type", "code", "statusCode", "requestId"] as const) {
+            const value = metadata[key];
+            if (typeof value === "string" || typeof value === "number") details[key] = value;
+        }
+    }
+
+    return details;
+};
+
 // ========================================
 
 const getCheckoutCallback = async (req: Request, res: Response) => {
@@ -115,14 +137,24 @@ const getStripeCheckoutSession = async (req: Request, res: Response) => {
         const { amount, currency = "GBP" } = req.query as Record<string, any>;
         const normalizedAmount = normalizeAmount(amount);
 
+        stripeLog("payment_intent.create.started", {
+            amount: normalizedAmount,
+            currency: currency.toUpperCase(),
+        });
         const paymentIntent = await stripe.paymentIntents.create({
             amount: normalizedAmount,
             currency: currency.toUpperCase(),
             automatic_payment_methods: { enabled: true },
         });
 
+        stripeLog("payment_intent.create.succeeded", {
+            paymentIntentId: paymentIntent.id,
+            status: paymentIntent.status,
+            hasClientSecret: Boolean(paymentIntent.client_secret),
+        });
         return res.json({ success: true, clientSecret: paymentIntent.client_secret });
     } catch (err) {
+        stripeLog("payment_intent.create.failed", stripeErrorDetails(err));
         return errorResponse(res, "Unable to create Stripe checkout session.", err);
     }
 };
@@ -194,7 +226,9 @@ const getStripeCheckoutCallback = async (req: Request, res: Response) => {
             (typeof body.id === "string" && body.id.startsWith("pi_") ? body.id : undefined);
 
         if (sessionId || (typeof body.id === "string" && body.id.startsWith("cs_"))) {
-            const session = await stripe.checkout.sessions.retrieve(sessionId || body.id);
+            const requestedSessionId = sessionId || body.id;
+            stripeLog("checkout_session.retrieve.started", { sessionId: requestedSessionId });
+            const session = await stripe.checkout.sessions.retrieve(requestedSessionId);
             const response: healthyResponse = {
                 success: true,
                 charge_id: session.id,
@@ -203,13 +237,23 @@ const getStripeCheckoutCallback = async (req: Request, res: Response) => {
                 status: session.payment_status === "paid" ? 200 : 402,
             };
 
+            stripeLog("checkout_session.retrieve.succeeded", {
+                sessionId: session.id,
+                paymentStatus: session.payment_status,
+                status: response.status,
+            });
             return res.json(response);
         }
 
         if (!paymentIntentId) {
+            stripeLog("callback.invalid_request", {
+                hasSessionId: Boolean(sessionId),
+                hasPaymentIntentId: Boolean(paymentIntentId),
+            });
             return res.status(400).json({ success: false, error: "Missing paymentIntentId or stripeSessionId" });
         }
 
+        stripeLog("payment_intent.retrieve.started", { paymentIntentId });
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
         const response: healthyResponse = {
@@ -220,8 +264,14 @@ const getStripeCheckoutCallback = async (req: Request, res: Response) => {
             status: paymentIntent.status === "succeeded" ? 200 : 402,
         };
 
+        stripeLog("payment_intent.retrieve.succeeded", {
+            paymentIntentId: paymentIntent.id,
+            paymentStatus: paymentIntent.status,
+            status: response.status,
+        });
         return res.json(response);
     } catch (err) {
+        stripeLog("callback.failed", stripeErrorDetails(err));
         return errorResponse(res, "Unable to verify Stripe session.", err);
     }
 };
@@ -243,8 +293,14 @@ const handleStripeCharge = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: "paymentMethodId is required" });
         }
 
+        const normalizedAmount = normalizeAmount(amount);
+        stripeLog("payment_intent.charge.started", {
+            amount: normalizedAmount,
+            currency: currency.toUpperCase(),
+            hasPaymentMethodId: true,
+        });
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: normalizeAmount(amount),
+            amount: normalizedAmount,
             currency: currency.toUpperCase(),
             payment_method: paymentMethodId,
             confirm: true,
@@ -259,8 +315,14 @@ const handleStripeCharge = async (req: Request, res: Response) => {
             status: paymentIntent.status === "succeeded" ? 200 : 402,
         };
 
+        stripeLog("payment_intent.charge.succeeded", {
+            paymentIntentId: paymentIntent.id,
+            paymentStatus: paymentIntent.status,
+            status: response.status,
+        });
         return res.json(response);
     } catch (err) {
+        stripeLog("payment_intent.charge.failed", stripeErrorDetails(err));
         return errorResponse(res, "Unable to create Stripe charge.", err);
     }
 };

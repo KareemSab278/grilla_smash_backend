@@ -73,15 +73,42 @@ export const checkDb = async (): Promise<void> => {
 
 // ========================================
 
-const getPgCode = (err: unknown): string | undefined => {
-    if (!(err instanceof postgres.PostgresError)) return undefined;
-    return err.code;
-};
-
-// turns postgres constraint / data failures into 4xx instead of leaking them as 500s
+// turns Postgres constraint / data failures into 4xx instead of leaking them as 500s
 export const mapDbError = (err: unknown): unknown => {
-    const code = getPgCode(err);
-    if (code === undefined) return err;
+    if (!(err instanceof postgres.PostgresError)) return err;
+    const code = err.code;
+
+    const isMappedDbError =
+        code === PG_VIOLATION.UNIQUE ||
+        code === PG_VIOLATION.FOREIGN_KEY ||
+        code === PG_VIOLATION.CHECK ||
+        code === PG_VIOLATION.NOT_NULL ||
+        code.startsWith(PG_VIOLATION.DATA_EXCEPTION_CLASS);
+
+    if (isMappedDbError) {
+        const details = [
+            err.table_name && `table ${err.table_name}`,
+            err.column_name && `column ${err.column_name}`,
+            err.constraint_name && `constraint ${err.constraint_name}`,
+        ].filter((detail): detail is string => Boolean(detail));
+
+        console.error("[db] mapped PostgreSQL constraint/data error", {
+            code,
+            schema: err.schema_name,
+            table: err.table_name,
+            column: err.column_name,
+            constraint: err.constraint_name,
+        });
+
+        if (
+            CONFIG.isDevelopment &&
+            (code === PG_VIOLATION.CHECK ||
+                code === PG_VIOLATION.NOT_NULL ||
+                code.startsWith(PG_VIOLATION.DATA_EXCEPTION_CLASS))
+        ) {
+            return badRequest(`One or more values are invalid (${[code, ...details].join("; ")})`);
+        }
+    }
 
     if (code === PG_VIOLATION.UNIQUE) return conflict("A record with those values already exists");
 

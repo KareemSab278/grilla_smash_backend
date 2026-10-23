@@ -332,6 +332,10 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
 
     const created = await transaction(async tx => {
         await assertBranchExists(tx, data.branch_id);
+        const business = requireRow(
+            await dbGet<{ currency: string }>(tx, QUERIES.GET.BUSINESS),
+            "business"
+        );
 
         const [productItems, offers] = await Promise.all([
             data.items.length > 0 ? priceItems(tx, data) : [],
@@ -388,6 +392,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
                 data.payment.provider,
                 orNull(data.payment.payment_reference),
                 total,
+                business.currency.toUpperCase(),
             ]);
         }
 

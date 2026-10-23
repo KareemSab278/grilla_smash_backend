@@ -221,6 +221,7 @@ CREATE TABLE public.payments (
   provider text NOT NULL,
   provider_payment_id text,
   amount integer NOT NULL,
+  currency text NOT NULL,
   status text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT payments_pkey PRIMARY KEY (id),

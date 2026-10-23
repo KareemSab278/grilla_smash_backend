@@ -30,6 +30,7 @@ const DEFAULT_DB_POOL_MAX = Number(process.env.DEFAULT_DB_POOL_MAX ?? 10);
 const DEFAULT_MAX_DELIVERY_DISTANCE_KM = Number(process.env.MAX_DELIVERY_DISTANCE_KM ?? 8);
 
 type Config = {
+    readonly isDevelopment: boolean;
     readonly googleMapsApiKey: string | undefined;
     readonly port: number;
     readonly host: string;
@@ -96,6 +97,7 @@ const parseBoolean = (raw: string | undefined, fallback: boolean): boolean => {
 };
 
 export const CONFIG: Config = {
+    isDevelopment: process.env.NODE_ENV === "development",
     port: parseInteger("PORT", process.env.PORT, DEFAULT_PORT, 0, 65535),
     host: process.env.HOST || DEFAULT_HOST,
     databaseUrl: getDatabaseUrl(),
