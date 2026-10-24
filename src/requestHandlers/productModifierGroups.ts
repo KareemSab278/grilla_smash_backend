@@ -9,11 +9,11 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbAll, dbRun, transaction } from "../db";
-import { getRequiredRow, groupBy } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbAll, dbRun, transaction } from "../database/db";
+import { getRequiredRow, groupBy } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
-import { productModifierGroupSchema } from "../schemas";
+import { productModifierGroupSchema } from "../database/schemas";
 import type {
     AttachModifierGroupResponse,
     ModifierGroupResponse,

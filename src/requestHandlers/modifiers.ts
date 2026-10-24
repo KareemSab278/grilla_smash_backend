@@ -9,11 +9,11 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbGet } from "../db";
-import { deleteById, getRequiredRow, newId, orNull, requireRow } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbGet } from "../database/db";
+import { deleteById, getRequiredRow, newId, orNull, requireRow } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
-import { modifierCreateSchema, modifierUpdateSchema } from "../schemas";
+import { modifierCreateSchema, modifierUpdateSchema } from "../database/schemas";
 import type { DeleteResponse, ModifierGroupRow, ModifierRow } from "../types";
 
 const router = express.Router();

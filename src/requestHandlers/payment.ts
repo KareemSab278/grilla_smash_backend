@@ -8,9 +8,9 @@
 import express from "express";
 import type { Request, Response } from "express";
 import { CONFIG } from "../config";
-import { stripe, requireShift4 } from "../payProviders";
-import { HttpError } from "../errors";
-import { normalizeAmount, buildCheckoutRequest } from "../helpers";
+import { stripe, requireShift4 } from "../payment/payProviders";
+import { HttpError } from "../helpers/errors";
+import { normalizeAmount, buildCheckoutRequest } from "../helpers/helpers";
 
 const router = express.Router();
 router.post("/payments/charge", async (req, res) => await handleCharge(req, res));

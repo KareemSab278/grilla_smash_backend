@@ -21,21 +21,21 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbAll, dbGet } from "../db";
-import { sendEmail } from "../email";
-import { badRequest, conflict, unauthorized } from "../errors";
-import { newId, requireRow } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbAll, dbGet } from "../database/db";
+import { sendEmail } from "../notifications/email";
+import { badRequest, conflict, unauthorized } from "../helpers/errors";
+import { newId, requireRow } from "../helpers/helpers";
 import { requireBusinessKey } from "../middleware/requireBusinessKey";
 import { parseInput } from "../middleware/validate";
-import { consumeResetCode, discardResetCode, issueResetCode, RESET_WINDOW_MS } from "../passwordResets";
+import { consumeResetCode, discardResetCode, issueResetCode, RESET_WINDOW_MS } from "../security/passwordResets";
 import {
     ADMIN_CREATION_CODE_WINDOW_MS,
     consumeAdminCreationCode,
     discardAdminCreationCode,
     issueAdminCreationCode,
-} from "../adminCreationCodes";
-import { hashPassword, verifyPassword } from "../passwords";
+} from "../security/adminCreationCodes";
+import { hashPassword, verifyPassword } from "../security/passwords";
 import {
     adminCreateSchema,
     adminCreationCodeRequestSchema,
@@ -44,7 +44,7 @@ import {
     userPasswordResetLegacySchema,
     userPasswordResetRequestSchema,
     userPasswordResetSchema,
-} from "../schemas";
+} from "../database/schemas";
 import type { PublicUser, UserRow } from "../types";
 
 type UsernameParams = { username: string };

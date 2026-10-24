@@ -10,11 +10,11 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbAll, dbGet } from "../db";
-import { deleteById, getRequiredRow, newId, orNull, requireRow } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbAll, dbGet } from "../database/db";
+import { deleteById, getRequiredRow, newId, orNull, requireRow } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
-import { categoryCreateSchema, categoryUpdateSchema } from "../schemas";
+import { categoryCreateSchema, categoryUpdateSchema } from "../database/schemas";
 import type { CategoryRow, DeleteResponse } from "../types";
 
 const router = express.Router();

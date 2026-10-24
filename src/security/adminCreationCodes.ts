@@ -3,7 +3,7 @@
 */
 
 import { randomInt } from "node:crypto";
-import { tooManyRequests } from "./errors";
+import { tooManyRequests } from "../helpers/errors";
 import { hashKey, keysMatch } from "./keys";
 
 export const ADMIN_CREATION_CODE_WINDOW_MS = 5 * 60 * 1000;

@@ -8,15 +8,15 @@
 
 import express, { type RequestHandler } from "express";
 import multer from "multer";
-import { badRequest, forbidden, notFound, payloadTooLarge } from "../errors";
+import { badRequest, forbidden, notFound, payloadTooLarge } from "../helpers/errors";
 import { CONFIG } from "../config";
-import { Images, MAX_IMAGE_SIZE_BYTES } from "../imageHandler/imageUpload";
-import { MAX_BUCKET_SIZE_BYTES } from "../imageHandler/imageQuota";
-import { associateUploadedImage } from "../imageHandler/imageAssociation";
-import { dbAll, dbGet, transaction } from "../db";
+import { Images, MAX_IMAGE_SIZE_BYTES } from "../images/imageUpload";
+import { MAX_BUCKET_SIZE_BYTES } from "../images/imageQuota";
+import { associateUploadedImage } from "../images/imageAssociation";
+import { dbAll, dbGet, transaction } from "../database/db";
 import { requireBranchManager } from "../middleware/requireBranchManager";
-import { QUERIES } from "../queries";
-import { requireRow } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import { requireRow } from "../helpers/helpers";
 
 const router = express.Router();
 const parseImage = multer({

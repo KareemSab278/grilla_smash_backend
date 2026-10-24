@@ -10,9 +10,9 @@
 
 import { randomBytes } from "node:crypto";
 import { badRequest, notFound } from "./errors";
-import { dbGet } from "./db";
-import type { Db } from "./db";
-import type { DeleteResponse, SqlParam } from "./types";
+import { dbGet } from "../database/db";
+import type { Db } from "../database/db";
+import type { DeleteResponse, SqlParam } from "../types";
 
 // 12 hex chars, same shape as the ids the old backend generated
 export const newId = (): string => randomBytes(6).toString("hex");

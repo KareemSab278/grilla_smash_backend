@@ -1,11 +1,11 @@
 import express from "express";
 import type { Request, Response } from "express";
-import { calculateDeliveryPricing } from "../deliveryPricing";
-import { getRequiredRow } from "../helpers";
+import { calculateDeliveryPricing } from "../payment/deliveryPricing";
+import { getRequiredRow } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
-import { QUERIES } from "../queries";
-import sql from "../db";
-import { deliveryQuoteSchema } from "../schemas";
+import { QUERIES } from "../queries/queries";
+import sql from "../database/db";
+import { deliveryQuoteSchema } from "../database/schemas";
 import type { BranchRow } from "../types";
 
 const router = express.Router();

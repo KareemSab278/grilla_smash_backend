@@ -1,4 +1,4 @@
-import { conflict } from "../errors";
+import { conflict } from "../helpers/errors";
 
 export const MAX_BUCKET_SIZE_BYTES = 5 * 1024 * 1024;
 

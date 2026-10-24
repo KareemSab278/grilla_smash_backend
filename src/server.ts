@@ -11,7 +11,7 @@
 import express from "express";
 import cors from "cors";
 import { CONFIG } from "./config";
-import { closeDb } from "./db";
+import { closeDb } from "./database/db";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter";
 

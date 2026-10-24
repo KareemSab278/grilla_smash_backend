@@ -7,10 +7,10 @@
 */
 
 import type { RequestHandler } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbGet } from "../db";
-import { unauthorized } from "../errors";
-import { keysMatch } from "../keys";
+import { QUERIES } from "../queries/queries";
+import sql, { dbGet } from "../database/db";
+import { unauthorized } from "../helpers/errors";
+import { keysMatch } from "../security/keys";
 
 export const requireBusinessKey: RequestHandler = async (req, _res, next) => {
     const rawKey = req.header("x-business-key");

@@ -5,10 +5,10 @@
     and never fails (or delays) the order request that triggered it.
 */
 
-import { QUERIES } from "./queries";
-import sql, { dbGet } from "./db";
+import { QUERIES } from "../queries/queries";
+import sql, { dbGet } from "../database/db";
 import { sendEmail } from "./email";
-import type { OrderStatus } from "./types";
+import type { OrderStatus } from "../types";
 
 type OrderEmailContent = {
     subject: string;

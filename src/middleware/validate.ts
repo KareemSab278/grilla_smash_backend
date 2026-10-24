@@ -5,7 +5,7 @@
 */
 
 import type { z } from "zod";
-import { unprocessable } from "../errors";
+import { unprocessable } from "../helpers/errors";
 
 const formatIssues = (error: z.ZodError): string =>
     error.issues

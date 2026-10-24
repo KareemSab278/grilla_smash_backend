@@ -10,13 +10,13 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbAll, dbRun, transaction } from "../db";
-import type { Db } from "../db";
-import { badRequest } from "../errors";
-import { deleteById, getRequiredRow, groupBy, newId, orNull } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbAll, dbRun, transaction } from "../database/db";
+import type { Db } from "../database/db";
+import { badRequest } from "../helpers/errors";
+import { deleteById, getRequiredRow, groupBy, newId, orNull } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
-import { modifierGroupCreateSchema, modifierGroupUpdateSchema } from "../schemas";
+import { modifierGroupCreateSchema, modifierGroupUpdateSchema } from "../database/schemas";
 import type { DeleteResponse, ModifierGroupResponse, ModifierGroupRow, ModifierRow } from "../types";
 
 const router = express.Router();

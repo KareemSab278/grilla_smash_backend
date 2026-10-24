@@ -6,8 +6,8 @@
 */
 
 import Stripe from "stripe";
-import { CONFIG } from "./config";
-import { HttpError } from "./errors";
+import { CONFIG } from "../config";
+import { HttpError } from "../helpers/errors";
 
 // the shift4 package ships no type definitions
 const createShift4 = require("shift4") as (secretKey: string) => any;

@@ -10,13 +10,13 @@
 import { randomBytes } from "node:crypto";
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbGet, transaction } from "../db";
-import { badRequest } from "../errors";
-import { newId, orNull, requireRow } from "../helpers";
-import { hashKey } from "../keys";
+import { QUERIES } from "../queries/queries";
+import sql, { dbGet, transaction } from "../database/db";
+import { badRequest } from "../helpers/errors";
+import { newId, orNull, requireRow } from "../helpers/helpers";
+import { hashKey } from "../security/keys";
 import { parseInput } from "../middleware/validate";
-import { businessCreateSchema, businessUpdateSchema } from "../schemas";
+import { businessCreateSchema, businessUpdateSchema } from "../database/schemas";
 import type { BusinessRow, CreateBusinessResponse } from "../types";
 
 const router = express.Router();

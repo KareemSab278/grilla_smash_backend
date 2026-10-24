@@ -7,7 +7,7 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { checkDb } from "../db";
+import { checkDb } from "../database/db";
 
 const router = express.Router();
 

@@ -5,7 +5,7 @@
     helper so handlers can update one day without clobbering the rest of the week.
 */
 
-import type { DayHours, DayOfWeek, OpeningHours } from "./types";
+import type { DayHours, DayOfWeek, OpeningHours } from "../types";
 
 const DAY_ORDER: readonly DayOfWeek[] = [
     "monday",

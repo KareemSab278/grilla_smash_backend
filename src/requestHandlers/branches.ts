@@ -15,9 +15,9 @@
 
 import express from "express";
 import type { Request, Response } from "express";
-import { QUERIES } from "../queries";
-import sql, { dbAll, dbGet } from "../db";
-import { deleteById, getRequiredRow, newId, orNull, requireRow, unique } from "../helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbAll, dbGet } from "../database/db";
+import { deleteById, getRequiredRow, newId, orNull, requireRow, unique } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
 import { requireBranchManager } from "../middleware/requireBranchManager";
 import {
@@ -26,11 +26,11 @@ import {
     branchUpdateSchema,
     openingHoursPatchSchema,
     openingHoursSchema,
-} from "../schemas";
-import { mergeOpeningHours } from "../branchHours";
+} from "../database/schemas";
+import { mergeOpeningHours } from "../branches/branchHours";
 import type { BranchRow, DeleteResponse } from "../types";
 import type { ProductRow } from "../types";
-import { notFound } from "../errors";
+import { notFound } from "../helpers/errors";
 
 const router = express.Router();
 

@@ -11,9 +11,9 @@
 
 import postgres from "postgres";
 import dns from "node:dns";
-import { CONFIG } from "./config";
-import { badRequest, conflict } from "./errors";
-import type { SqlParam } from "./types";
+import { CONFIG } from "../config";
+import { badRequest, conflict } from "../helpers/errors";
+import type { SqlParam } from "../types";
 
 // postgres error codes:
 const PG_VIOLATION = {

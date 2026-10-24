@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { badRequest, payloadTooLarge } from "../errors";
+import { badRequest, payloadTooLarge } from "../helpers/errors";
 
 export const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 export const MAX_IMAGE_OUTPUT_BYTES = 80 * 1024;

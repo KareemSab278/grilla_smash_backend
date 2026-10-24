@@ -7,8 +7,8 @@
 */
 
 import type { ErrorRequestHandler, RequestHandler } from "express";
-import { HttpError, notFound } from "../errors";
-import { mapDbError } from "../db";
+import { HttpError, notFound } from "../helpers/errors";
+import { mapDbError } from "../database/db";
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
     next(notFound(`Cannot ${req.method} ${req.path}`));

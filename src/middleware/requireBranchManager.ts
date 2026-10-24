@@ -8,9 +8,9 @@
 
 import type { Request } from "express";
 import { CONFIG } from "../config";
-import { QUERIES } from "../queries";
-import sql, { dbGet } from "../db";
-import { forbidden, unauthorized } from "../errors";
+import { QUERIES } from "../queries/queries";
+import sql, { dbGet } from "../database/db";
+import { forbidden, unauthorized } from "../helpers/errors";
 import type { UserRow } from "../types";
 
 const extractBearerToken = (req: Request): string => {
