@@ -393,6 +393,14 @@ export const orderStatusUpdateSchema = z.object({
     status: z.enum(ORDER_STATUSES),
 });
 
+export const refundFullSchema = z.object({
+    paymentRef: z.string().trim().min(1),
+});
+
+export const refundPartialSchema = refundFullSchema.extend({
+    amount: z.int().positive(),
+});
+
 // ========================================
 // INFERRED REQUEST TYPES
 // ========================================
@@ -426,3 +434,5 @@ export type OrderOfferCreate = z.infer<typeof orderOfferSchema>;
 export type DeliveryQuote = z.infer<typeof deliveryQuoteSchema>;
 export type OrderCreate = z.infer<typeof orderCreateSchema>;
 export type OrderStatusUpdate = z.infer<typeof orderStatusUpdateSchema>;
+export type RefundFull = z.infer<typeof refundFullSchema>;
+export type RefundPartial = z.infer<typeof refundPartialSchema>;

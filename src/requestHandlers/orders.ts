@@ -362,7 +362,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
         const total = subtotal - discount + deliveryFee;
 
         // lock so two simultaneous orders on one branch can never receive the same number
-        await dbRun(tx, QUERIES.POST.LOCK_BRANCH_ORDERS, [data.branch_id]);
+        await dbRun(tx, QUERIES.GET.LOCK_BRANCH_ORDERS, [data.branch_id]);
         const next = requireRow(
             await dbGet<{ next_number: number }>(tx, QUERIES.GET.NEXT_ORDER_NUMBER, [data.branch_id]),
             "order number"

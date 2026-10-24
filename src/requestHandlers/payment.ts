@@ -9,10 +9,16 @@ import express from "express";
 import type { Request, Response } from "express";
 import { CONFIG } from "../config";
 import { stripe, requireShift4 } from "../payment/payProviders";
+import { REFUND } from "../payment/stripeRefunding";
 import { HttpError } from "../helpers/errors";
 import { normalizeAmount, buildCheckoutRequest } from "../helpers/helpers";
+import { requireBranchManager } from "../middleware/requireBranchManager";
+import { parseInput } from "../middleware/validate";
+import { refundFullSchema, refundPartialSchema } from "../database/schemas";
 
 const router = express.Router();
+router.post("/refund/full", async (req, res) => await fullRefund(req, res));
+router.post("/refund/partial", async (req, res) => await partialRefund(req, res));
 router.post("/payments/charge", async (req, res) => await handleCharge(req, res));
 router.get("/payments/checkout-session", async (req, res) => await getCheckoutSession(req, res));
 router.post("/payments/checkout-callback", async (req, res) => await getCheckoutCallback(req, res));
@@ -70,6 +76,52 @@ const stripeErrorDetails = (err: unknown): Record<string, unknown> => {
     }
 
     return details;
+};
+
+type RefundResponse = {
+    success: true;
+    refund_id: string;
+    amount: number;
+    currency: string;
+    status: string | null;
+};
+
+const fullRefund = async (req: Request, res: Response<RefundResponse | ErrorResponse>) => {
+    await requireBranchManager(req);
+    const { paymentRef } = parseInput(refundFullSchema, req.body);
+
+    try {
+        const refund = await REFUND.full(paymentRef);
+        return res.json({
+            success: true,
+            refund_id: refund.id,
+            amount: refund.amount,
+            currency: refund.currency,
+            status: refund.status,
+        });
+    } catch (err) {
+        stripeLog("refund.full.failed", stripeErrorDetails(err));
+        return errorResponse(res, "Unable to issue full refund.", err);
+    }
+};
+
+const partialRefund = async (req: Request, res: Response<RefundResponse | ErrorResponse>) => {
+    await requireBranchManager(req);
+    const { paymentRef, amount } = parseInput(refundPartialSchema, req.body);
+
+    try {
+        const refund = await REFUND.partial(paymentRef, amount);
+        return res.json({
+            success: true,
+            refund_id: refund.id,
+            amount: refund.amount,
+            currency: refund.currency,
+            status: refund.status,
+        });
+    } catch (err) {
+        stripeLog("refund.partial.failed", stripeErrorDetails(err));
+        return errorResponse(res, "Unable to issue partial refund.", err);
+    }
 };
 
 // ========================================

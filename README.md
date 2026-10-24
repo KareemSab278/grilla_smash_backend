@@ -754,6 +754,15 @@ Stripe is the default provider. Set `USE_STRIPE=false` to use Shift4 instead (50
 
 Success responses are `{ success, charge_id, amount, currency, status }` where `status` is `200` when paid and `402` when not.
 
+Refund endpoints always use Stripe and require an active `ADMIN` or `MANAGER` when `BRANCH_SETTINGS_AUTH_ENABLED=true`. Send `Authorization: Bearer <user-id>`; when authorization is disabled, they follow the development bypass used by other branch-manager-protected routes.
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| POST | `/refund/full` | `{ "paymentRef": "pi_123" }` | Refund the remaining refundable amount |
+| POST | `/refund/partial` | `{ "paymentRef": "pi_123", "amount": 500 }` | Refund a positive amount in the smallest currency unit (pence for GBP) |
+
+Successful refunds return `{ "success": true, "refund_id", "amount", "currency", "status" }`. Invalid bodies return 422; Stripe failures return the payment error response shape above.
+
 ### 8.16 Images
 
 | Method | Path | Description |
