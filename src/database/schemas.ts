@@ -394,7 +394,8 @@ export const orderStatusUpdateSchema = z.object({
 });
 
 export const refundFullSchema = z.object({
-    paymentRef: z.string().trim().min(1),
+    order_id: id,
+    reason: z.string().trim().max(500).nullish(),
 });
 
 export const refundPartialSchema = refundFullSchema.extend({

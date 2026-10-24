@@ -10,8 +10,12 @@ import type { Request, Response } from "express";
 import { CONFIG } from "../config";
 import { stripe, requireShift4 } from "../payment/payProviders";
 import { REFUND } from "../payment/stripeRefunding";
-import { HttpError } from "../helpers/errors";
-import { normalizeAmount, buildCheckoutRequest } from "../helpers/helpers";
+import { badRequest, conflict, HttpError } from "../helpers/errors";
+import { normalizeAmount, buildCheckoutRequest, getRequiredRow, orNull, requireRow } from "../helpers/helpers";
+import { QUERIES } from "../queries/queries";
+import sql, { dbGet } from "../database/db";
+import { notifyOrderRefund } from "../notifications/orderEmails";
+import type { OrderRow } from "../types";
 import { requireBranchManager } from "../middleware/requireBranchManager";
 import { parseInput } from "../middleware/validate";
 import { refundFullSchema, refundPartialSchema } from "../database/schemas";
@@ -84,21 +88,54 @@ type RefundResponse = {
     amount: number;
     currency: string;
     status: string | null;
+    order_status: string;
+};
+
+const formatPounds = (pence: number): string => `£${(pence / 100).toFixed(2)}`;
+
+// "PREPARING - refund £5.00" -> "PREPARING", so a second partial refund does not stack suffixes
+const baseStatus = (status: string): string => status.replace(/ - refund £.*$/, "");
+
+// issues the Stripe refund, then records it on the order and emails the customer
+const refundOrder = async (
+    orderId: string,
+    reason: string | null | undefined,
+    amount: number | undefined
+): Promise<RefundResponse> => {
+    const order = await getRequiredRow<OrderRow>(sql, QUERIES.GET.ORDER_BY_ID, orderId, "order");
+
+    if (!order.payment_reference) throw badRequest("Order has no payment reference to refund");
+    if (order.status === "REFUNDED") throw conflict("Order is already fully refunded");
+
+    const partial = amount !== undefined;
+    const refund = partial
+        ? await REFUND.partial(order.payment_reference, amount)
+        : await REFUND.full(order.payment_reference);
+
+    const newStatus = partial ? `${baseStatus(order.status)} - refund ${formatPounds(refund.amount)}` : "REFUNDED";
+    const updated = requireRow(
+        await dbGet<{ id: string; status: string }>(sql, QUERIES.PATCH.ORDER_REFUND, [order.id, newStatus, orNull(reason)]),
+        "order"
+    );
+
+    notifyOrderRefund({ orderId: order.id, amount: refund.amount, partial, reason: reason ?? null });
+
+    return {
+        success: true,
+        refund_id: refund.id,
+        amount: refund.amount,
+        currency: refund.currency,
+        status: refund.status ?? null,
+        order_status: updated.status,
+    };
 };
 
 const fullRefund = async (req: Request, res: Response<RefundResponse | ErrorResponse>) => {
     await requireBranchManager(req);
-    const { paymentRef } = parseInput(refundFullSchema, req.body);
+    const { order_id, reason } = parseInput(refundFullSchema, req.body);
 
     try {
-        const refund = await REFUND.full(paymentRef);
-        return res.json({
-            success: true,
-            refund_id: refund.id,
-            amount: refund.amount,
-            currency: refund.currency,
-            status: refund.status,
-        });
+        return res.json(await refundOrder(order_id, reason, undefined));
     } catch (err) {
         stripeLog("refund.full.failed", stripeErrorDetails(err));
         return errorResponse(res, "Unable to issue full refund.", err);
@@ -107,17 +144,10 @@ const fullRefund = async (req: Request, res: Response<RefundResponse | ErrorResp
 
 const partialRefund = async (req: Request, res: Response<RefundResponse | ErrorResponse>) => {
     await requireBranchManager(req);
-    const { paymentRef, amount } = parseInput(refundPartialSchema, req.body);
+    const { order_id, reason, amount } = parseInput(refundPartialSchema, req.body);
 
     try {
-        const refund = await REFUND.partial(paymentRef, amount);
-        return res.json({
-            success: true,
-            refund_id: refund.id,
-            amount: refund.amount,
-            currency: refund.currency,
-            status: refund.status,
-        });
+        return res.json(await refundOrder(order_id, reason, amount));
     } catch (err) {
         stripeLog("refund.partial.failed", stripeErrorDetails(err));
         return errorResponse(res, "Unable to issue partial refund.", err);

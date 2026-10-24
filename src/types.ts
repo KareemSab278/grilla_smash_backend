@@ -235,6 +235,7 @@ export type OrderRow = {
     total: number;
     notes: string | null;
     payment_reference: string | null;
+    refund_reason: string | null;
     created_at: Date;
     updated_at: Date;
 };

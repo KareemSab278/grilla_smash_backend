@@ -23,11 +23,12 @@ CREATE TABLE public.branches (
   phone text,
   latitude double precision CHECK (latitude IS NULL OR latitude >= '-90'::integer::double precision AND latitude <= 90::double precision),
   longitude double precision CHECK (longitude IS NULL OR longitude >= '-180'::integer::double precision AND longitude <= 180::double precision),
-  opening_hours jsonb NOT NULL DEFAULT '{"monday":{"open":"09:00","close":"17:00","is_closed":false},"tuesday":{"open":"09:00","close":"17:00","is_closed":false},"wednesday":{"open":"09:00","close":"17:00","is_closed":false},"thursday":{"open":"09:00","close":"17:00","is_closed":false},"friday":{"open":"09:00","close":"17:00","is_closed":false},"saturday":{"open":"09:00","close":"17:00","is_closed":false},"sunday":{"open":"09:00","close":"17:00","is_closed":false}}'::jsonb,
-  unavailable_products text[] NOT NULL DEFAULT '{}'::text[],
   active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  opening_hours jsonb NOT NULL DEFAULT '{"friday": {"open": "09:00", "close": "17:00"}, "monday": {"open": "09:00", "close": "17:00"}, "sunday": {"open": "09:00", "close": "17:00"}, "tuesday": {"open": "09:00", "close": "17:00"}, "saturday": {"open": "09:00", "close": "17:00"}, "thursday": {"open": "09:00", "close": "17:00"}, "wednesday": {"open": "09:00", "close": "17:00"}}'::jsonb,
+  unavailable_products ARRAY NOT NULL DEFAULT '{}'::text[],
+  branch_key text UNIQUE,
   CONSTRAINT branches_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.categories (
@@ -170,9 +171,12 @@ CREATE TABLE public.orders (
   discount integer NOT NULL DEFAULT 0,
   total integer NOT NULL,
   notes text,
-  payment_reference text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  payment_reference text,
+  payment_token_hash text,
+  checkout_request_hash text,
+  refund_reason text,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)
 );
@@ -221,21 +225,20 @@ CREATE TABLE public.payments (
   provider text NOT NULL,
   provider_payment_id text,
   amount integer NOT NULL,
-  currency text NOT NULL,
   status text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  currency text NOT NULL,
   CONSTRAINT payments_pkey PRIMARY KEY (id),
   CONSTRAINT payments_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
 CREATE TABLE public.users (
-  id text NOT NULL,
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
   username text NOT NULL UNIQUE,
   password_hash text NOT NULL,
-  email text,
   role text NOT NULL DEFAULT 'ADMIN'::text CHECK (role = ANY (ARRAY['ADMIN'::text, 'MANAGER'::text])),
   active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  email text NOT NULL,
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
-CREATE UNIQUE INDEX users_email_key ON public.users (lower(email));

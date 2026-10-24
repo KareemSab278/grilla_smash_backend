@@ -758,10 +758,12 @@ Refund endpoints always use Stripe and require an active `ADMIN` or `MANAGER` wh
 
 | Method | Path | Body | Description |
 |---|---|---|---|
-| POST | `/refund/full` | `{ "paymentRef": "pi_123" }` | Refund the remaining refundable amount |
-| POST | `/refund/partial` | `{ "paymentRef": "pi_123", "amount": 500 }` | Refund a positive amount in the smallest currency unit (pence for GBP) |
+| POST | `/refund/full` | `{ "order_id": "c7cea41be001", "reason": "Cold food" }` | Refund the remaining refundable amount of the order's payment; status becomes `REFUNDED` |
+| POST | `/refund/partial` | `{ "order_id": "c7cea41be001", "amount": 500, "reason": "Missing side" }` | Refund a positive amount in pence; status becomes `<previous status> - refund £5.00` |
 
-Successful refunds return `{ "success": true, "refund_id", "amount", "currency", "status" }`. Invalid bodies return 422; Stripe failures return the payment error response shape above.
+`reason` is optional and stored in `orders.refund_reason` (run `migrations/20261024_order_refund_reason.sql`). The order's `payment_reference` is what gets refunded (400 if it has none, 409 if already `REFUNDED`). If the order has a `customer_email` the customer is emailed the refund amount and reason (fire and forget). Note a partially refunded order no longer matches the active-orders statuses, so it drops out of `GET /orders/:branchId` (it stays in history).
+
+Successful refunds return `{ "success": true, "refund_id", "amount", "currency", "status", "order_status" }`. Invalid bodies return 422; Stripe failures return the payment error response shape above.
 
 ### 8.16 Images
 

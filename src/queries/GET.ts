@@ -261,6 +261,8 @@ WHERE m.active
   AND pmg.product_id = ANY($1::text[]);
 `;
 
+const getOrderByIdQuery: string = `SELECT * FROM orders WHERE id = $1;`;
+
 const getOrderEmailTargetQuery: string = `SELECT order_number, customer_email FROM orders WHERE id = $1;`;
 
 
@@ -314,6 +316,7 @@ export const GET = {
         ORDER_PRICING_PRODUCTS: getOrderPricingProductsQuery,
         ORDER_PRICING_GROUPS: getOrderPricingGroupsQuery,
         ORDER_PRICING_MODIFIERS: getOrderPricingModifiersQuery,
+        ORDER_BY_ID: getOrderByIdQuery,
         ORDER_EMAIL_TARGET: getOrderEmailTargetQuery,
         LOCK_BRANCH_ORDERS: lockBranchOrdersQuery,
     }

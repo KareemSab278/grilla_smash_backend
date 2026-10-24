@@ -9,6 +9,7 @@ import { QUERIES } from "../queries/queries";
 import sql, { dbGet } from "../database/db";
 import { sendEmail } from "./email";
 import type { OrderStatus } from "../types";
+import { CONFIG } from "../config";
 
 type OrderEmailContent = {
     subject: string;
@@ -55,18 +56,76 @@ const sendOrderStatusEmail = async (orderId: string, status: OrderStatus): Promi
         QUERIES.GET.ORDER_EMAIL_TARGET,
         [orderId]
     );
-    if (!order?.customer_email) return;
+    if (!order?.customer_email) {
+        CONFIG.isDevelopment && console.log(`No customer email for order ${orderId}`);
+        return;
+    }
 
-    await sendEmail({
-        to: order.customer_email,
-        subject: content.subject,
-        title: content.subject,
-        message: `Your order #${order.order_number} ${content.body}`,
-    });
+    if (CONFIG.isDevelopment) {
+        const message = {
+            to: order.customer_email,
+            subject: content.subject,
+            title: content.subject,
+            message: `Your order #${order.order_number} ${content.body}`,
+        };
+        console.log("Development email message:", message);
+        await sendEmail(message);
+    } else {
+        await sendEmail({
+            to: order.customer_email,
+            subject: content.subject,
+            title: content.subject,
+            message: `Your order #${order.order_number} ${content.body}`,
+        });
+
+    }
 };
 
 export const notifyOrderStatus = (orderId: string, status: OrderStatus): void => {
     sendOrderStatusEmail(orderId, status).catch((err: unknown) => {
         console.error(`Order email failed (order ${orderId}, status ${status}):`, err);
+    });
+};
+
+const formatPounds = (pence: number): string => `£${(pence / 100).toFixed(2)}`;
+
+type RefundEmail = {
+    orderId: string;
+    amount: number;
+    partial: boolean;
+    reason: string | null;
+};
+
+const sendOrderRefundEmail = async ({ orderId, amount, partial, reason }: RefundEmail): Promise<void> => {
+    const order = await dbGet<{ order_number: number; customer_email: string | null }>(
+        sql,
+        QUERIES.GET.ORDER_EMAIL_TARGET,
+        [orderId]
+    );
+    if (!order?.customer_email) {
+        CONFIG.isDevelopment && console.log(`No customer email for order ${orderId}, refund email skipped`);
+        return;
+    }
+
+    const subject = partial ? "Your order has been partially refunded" : "Your order has been refunded";
+    const lines = [
+        partial
+            ? `A partial refund of ${formatPounds(amount)} has been issued for your order #${order.order_number}.`
+            : `Your order #${order.order_number} has been fully refunded (${formatPounds(amount)}).`,
+    ];
+    if (reason) lines.push(`Reason: ${reason}`);
+    lines.push("The money should reach your account within 5 working days. If you have any questions, please give our store a call.");
+
+    const message = { to: order.customer_email, subject, title: subject, message: lines.join("\n") };
+    if (CONFIG.isDevelopment) console.log("Development refund email message:", message);
+
+    await sendEmail(message);
+    CONFIG.isDevelopment && console.log(`Refund email sent (order ${orderId})`);
+};
+
+export const notifyOrderRefund = (refund: RefundEmail): void => {
+    CONFIG.isDevelopment && console.log(`Refund email queued (order ${refund.orderId})`);
+    sendOrderRefundEmail(refund).catch((err: unknown) => {
+        console.error(`Refund email failed (order ${refund.orderId}):`, err);
     });
 };
