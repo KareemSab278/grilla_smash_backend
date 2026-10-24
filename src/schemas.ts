@@ -324,6 +324,14 @@ export const ORDER_STATUSES = ["PENDING", "ACCEPTED", "PREPARING", "READY", "COM
 
 const optionalShortText = z.string().trim().min(1).nullish();
 
+export const deliveryQuoteSchema = z.object({
+    branch_id: id,
+    address_line1: name,
+    address_line2: optionalShortText,
+    city: name,
+    postcode: name,
+});
+
 const orderItemSchema = z.object({
     product_id: id,
     quantity: z.int().min(1).max(99),
@@ -415,5 +423,6 @@ export type OfferRuleInput = z.infer<typeof offerRuleSchema>;
 export type OfferCreate = z.infer<typeof offerCreateSchema>;
 export type OfferUpdate = z.infer<typeof offerUpdateSchema>;
 export type OrderOfferCreate = z.infer<typeof orderOfferSchema>;
+export type DeliveryQuote = z.infer<typeof deliveryQuoteSchema>;
 export type OrderCreate = z.infer<typeof orderCreateSchema>;
 export type OrderStatusUpdate = z.infer<typeof orderStatusUpdateSchema>;

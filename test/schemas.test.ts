@@ -10,6 +10,7 @@ import test from "node:test";
 import {
     businessCreateSchema,
     branchUnavailableProductsSchema,
+    deliveryQuoteSchema,
     openingHoursPatchSchema,
     openingHoursSchema,
     offerCreateSchema,
@@ -24,6 +25,27 @@ const validOrder = {
     customer_name: "Jo",
     items: [{ product_id: "p1", quantity: 2 }],
 };
+
+test("deliveryQuoteSchema requires a branch and complete delivery address", () => {
+    assert.deepEqual(
+        deliveryQuoteSchema.parse({
+            branch_id: "b1",
+            address_line1: "  1 Main Street ",
+            city: " London ",
+            postcode: " SW1A 1AA ",
+        }),
+        {
+            branch_id: "b1",
+            address_line1: "1 Main Street",
+            city: "London",
+            postcode: "SW1A 1AA",
+        }
+    );
+    assert.throws(
+        () => deliveryQuoteSchema.parse({ branch_id: "b1", address_line1: "1 Main Street", city: "London" }),
+        /postcode/
+    );
+});
 
 test("businessCreateSchema trims fields and defaults currency", () => {
     const parsed = businessCreateSchema.parse({

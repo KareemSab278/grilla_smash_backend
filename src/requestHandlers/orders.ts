@@ -39,11 +39,12 @@ import type { Db } from "../db";
 import { badRequest, notFound } from "../errors";
 import { getRequiredRow, groupBy, newId, orNull, requireRow, unique } from "../helpers";
 import { notifyOrderStatus } from "../orderEmails";
+import { calculateDeliveryPricing } from "../deliveryPricing";
 import { parseInput } from "../middleware/validate";
 import { loadAutomaticOffers, loadOffer } from "./offers";
 import { freeItems, priceBundle } from "../offerPricing";
 import type { PricedBundle } from "../offerPricing";
-import { orderCreateSchema, orderStatusUpdateSchema } from "../schemas";
+import { deliveryQuoteSchema, orderCreateSchema, orderStatusUpdateSchema } from "../schemas";
 import type { OrderCreate } from "../schemas";
 import type {
     BranchRow,
@@ -330,6 +331,18 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
         throw new Error("Payment reference is required when payment is provided");
     }
 
+    let deliveryFee = 0;
+    if (data.order_type === "DELIVERY") {
+        const deliveryAddress = parseInput(deliveryQuoteSchema, data);
+        const branch = await getRequiredRow<BranchRow>(
+            sql,
+            QUERIES.GET.BRANCH_BY_ID,
+            deliveryAddress.branch_id,
+            "branch"
+        );
+        ({ feePence: deliveryFee } = await calculateDeliveryPricing(branch, deliveryAddress));
+    }
+
     const created = await transaction(async tx => {
         await assertBranchExists(tx, data.branch_id);
         const business = requireRow(
@@ -346,7 +359,6 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
 
         const subtotal = items.reduce((sum, item) => sum + item.total, 0);
         const discount = offers.bundles.reduce((sum, bundle) => sum + bundle.discount, 0);
-        const deliveryFee = data.order_type === "DELIVERY" ? data.delivery_fee : 0;
         const total = subtotal - discount + deliveryFee;
 
         // lock so two simultaneous orders on one branch can never receive the same number

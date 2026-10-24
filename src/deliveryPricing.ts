@@ -5,7 +5,7 @@ import type { BranchRow } from "./types";
 const KM_TO_MILES = 0.621371;
 const MINIMUM_DELIVERY_FEE_PENCE = 300;
 const CHARGE_PER_TENTH_MILE_PENCE = 10;
-const FREE_DISTANCE_MILES = 3;
+const BASE_DISTANCE_MILES = 3;
 
 type Coordinates = {
     lat: number;
@@ -142,9 +142,9 @@ export const chargeDeliveryFee = (isPickUp: boolean, distanceKm: number | null):
     }
 
     const miles = distanceKm * KM_TO_MILES;
-    if (miles <= FREE_DISTANCE_MILES) return MINIMUM_DELIVERY_FEE_PENCE;
+    if (miles <= BASE_DISTANCE_MILES) return MINIMUM_DELIVERY_FEE_PENCE;
 
-    const extraTenths = Math.ceil((miles - FREE_DISTANCE_MILES) * 10 - 1e-9);
+    const extraTenths = Math.ceil((miles - BASE_DISTANCE_MILES) * 10 - 1e-9);
     return MINIMUM_DELIVERY_FEE_PENCE + extraTenths * CHARGE_PER_TENTH_MILE_PENCE;
 };
 

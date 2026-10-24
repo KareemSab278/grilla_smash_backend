@@ -123,6 +123,8 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `STRIPE_SECRET_TEST_KEY` | yes | none | Stripe secret key. Stripe is the default payment provider. |
 | `USE_STRIPE` | no | `true` | Set to `false` to route the payment endpoints through Shift4 instead of Stripe. |
 | `SHIFT4_SECRET_KEY` | no | none | Shift4 secret key. Required when `USE_STRIPE=false`; otherwise Shift4 is not used. |
+| `GOOGLE_MAPS_API_KEY` | required for delivery | none | Google Maps Geocoding and Routes API key. Used to calculate driving distance and enforce delivery range. |
+| `MAX_DELIVERY_DISTANCE_KM` | no | `8` | Maximum driving distance accepted for delivery, in kilometres (1–100). |
 | `RESEND_API_KEY` | yes | none | Resend API key, used for order status emails and password reset codes. |
 | `EMAIL_FROM` | no | `test_business <grillasmash@gmail.com>` | Sender of every email, in `email@example.com` or `Name <email@example.com>` format. Configure a sender/domain verified with Resend for delivery; the default is for the current test setup. |
 | `SUPABASE_URL` | only for image storage | none | Supabase project URL used by the image storage service. |
@@ -544,7 +546,7 @@ Body fields:
 | `customer_name` | yes | |
 | `customer_phone`, `customer_email` | no | Email must be valid |
 | `address_line1`, `address_line2`, `city`, `postcode` | for `DELIVERY` | `address_line1`, `city` and `postcode` are required when delivering |
-| `delivery_fee` | no | Pence, default 0. Only counted for `DELIVERY` |
+| `delivery_fee` | no | Server-calculated for `DELIVERY`; any client-sent value is ignored. Pence. |
 | `notes` | no | Up to 2000 characters |
 | `items` | one of `items` / `offers` | Up to 100 items |
 | `items[].product_id` | yes | |
@@ -561,7 +563,6 @@ curl -X POST localhost:8000/orders -H 'Content-Type: application/json' -d '{
   "customer_name": "Jordan",
   "customer_email": "jordan@example.com",
   "address_line1": "1 Test Street", "city": "London", "postcode": "SW1A 1AA",
-  "delivery_fee": 250,
   "items": [
     { "product_id": "5dbf0d8e43d9", "quantity": 2, "modifier_ids": ["17896a2d3891"], "notes": "extra crispy" }
   ],
@@ -624,6 +625,21 @@ curl -X PATCH localhost:8000/orders/status -H 'Content-Type: application/json' \
   }]
 }
 ```
+
+Before checkout, request a quote with the selected branch and delivery address:
+
+```sh
+curl -X POST http://localhost:8000/delivery/quote \
+  -H "Content-Type: application/json" \
+  -d '{
+    "branch_id": "41bc6ddf2608",
+    "address_line1": "1 Test Street",
+    "city": "London",
+    "postcode": "SW1A 1AA"
+  }'
+```
+
+Response: `{ "delivery_fee": 300, "distance_km": 2.4 }`. The fee is in pence: £3 minimum, covering up to 3 miles, plus 10p for each started 0.1 mile beyond that. The endpoint returns 400 if the address cannot be located or is outside the branch's delivery area. Use `delivery_fee` to display the checkout total and create the Stripe PaymentIntent. When `POST /orders` is submitted, the server recalculates the driving distance and fee and uses that value for the saved order and total; the client-provided `delivery_fee` is not trusted.
 
 `name`, `unit_price` and modifier `name` / `price` are snapshots taken at order time.
 
