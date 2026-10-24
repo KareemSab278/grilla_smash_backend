@@ -28,10 +28,10 @@ import { randomUUID } from "node:crypto";
 import { CONFIG } from "../config";
 import { dbRun, transaction, type Db } from "../database/db";
 import { badRequest } from "../helpers/errors";
-import { assertWithinBucketQuota, withLocalBucketQuotaLock } from "../imageHandler/imageQuota";
-import { MAX_IMAGE_OUTPUT_BYTES, processImage } from "../imageHandler/imageProcessing";
+import { assertWithinBucketQuota, withLocalBucketQuotaLock } from "./imageQuota";
+import { MAX_IMAGE_OUTPUT_BYTES, processImage } from "./imageProcessing";
 
-export { MAX_IMAGE_SIZE_BYTES } from "../imageHandler/imageProcessing";
+export { MAX_IMAGE_SIZE_BYTES } from "./imageProcessing";
 
 const SUPABASE_URL = CONFIG.supabaseUrl;
 const SUPABASE_SECRET_KEY = CONFIG.supabaseSecretKey;
