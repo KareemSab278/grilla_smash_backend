@@ -30,6 +30,7 @@ import delivery from "./requestHandlers/delivery";
 import payment from "./requestHandlers/payment";
 import users from "./requestHandlers/users";
 import images from "./requestHandlers/images";
+import kdsNotifications from "./requestHandlers/kdsNotifications";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -56,6 +57,7 @@ app.use(orders);
 app.use(payment);
 app.use(users);
 app.use(images);
+app.use(kdsNotifications);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -33,6 +33,18 @@ const getBranchesQuery: string = `SELECT * FROM branches ORDER BY name;`;
 
 const getBranchByIdQuery: string = `SELECT * FROM branches WHERE id = $1;`;
 
+const getActiveBranchByKeyQuery: string = `
+SELECT id FROM branches
+WHERE branch_key = $1 AND active = TRUE
+LIMIT 1;
+`;
+
+const getActiveKdsNotificationsQuery: string = `
+SELECT id, expo_push_token
+FROM kds_notifications
+WHERE branch_id = $1 AND active = TRUE;
+`;
+
 
 // BRANCH PRODUCTS OVERRIDES
 const getBranchProductsQuery: string = `
@@ -279,6 +291,8 @@ export const GET = {
 
         BRANCHES: getBranchesQuery,
         BRANCH_BY_ID: getBranchByIdQuery,
+        ACTIVE_BRANCH_BY_KEY: getActiveBranchByKeyQuery,
+        ACTIVE_KDS_NOTIFICATIONS: getActiveKdsNotificationsQuery,
         BRANCH_PRODUCTS: getBranchProductsQuery,
 
         CATEGORIES: getCategoriesQuery,

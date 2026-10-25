@@ -160,6 +160,13 @@ export const branchUpdateSchema = z.object({
     active: z.boolean().nullish(),
 });
 
+export const kdsNotificationRegistrationSchema = z.object({
+    branchKey: z.string().trim().min(1).max(512),
+    deviceId: z.string().trim().min(1).max(255),
+    expoPushToken: z.string().trim().min(1).max(512),
+    platform: z.literal("android"),
+});
+
 export const branchUnavailableProductsSchema = z.object({
     unavailable_products: z.array(id),
 });
@@ -415,6 +422,7 @@ export type UserPasswordReset = z.infer<typeof userPasswordResetSchema>;
 export type UserPasswordResetLegacy = z.infer<typeof userPasswordResetLegacySchema>;
 export type BranchCreate = z.infer<typeof branchCreateSchema>;
 export type BranchUpdate = z.infer<typeof branchUpdateSchema>;
+export type KdsNotificationRegistration = z.infer<typeof kdsNotificationRegistrationSchema>;
 export type OpeningHoursInput = z.infer<typeof openingHoursSchema>;
 export type OpeningHoursPatch = z.infer<typeof openingHoursPatchSchema>;
 export type CategoryCreate = z.infer<typeof categoryCreateSchema>;

@@ -39,6 +39,7 @@ import type { Db } from "../database/db";
 import { badRequest, notFound } from "../helpers/errors";
 import { getRequiredRow, groupBy, newId, orNull, requireRow, unique } from "../helpers/helpers";
 import { notifyOrderStatus } from "../notifications/orderEmails";
+import { notifyKdsOfNewOrder } from "../notifications/kdsNotification";
 import { calculateDeliveryPricing } from "../payment/deliveryPricing";
 import { parseInput } from "../middleware/validate";
 import { loadAutomaticOffers, loadOffer } from "./offers";
@@ -411,6 +412,7 @@ const createOrder = async (req: Request, res: Response<CreateOrderResponse>): Pr
         return order;
     });
 
+    notifyKdsOfNewOrder(created);
     notifyOrderStatus(created.id, created.status);
 
     res.status(201).json({

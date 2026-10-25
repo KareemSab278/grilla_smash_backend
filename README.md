@@ -65,6 +65,7 @@ Money is always an **integer in pence** (`£8.99` is `899`). Ids are 12 characte
 2. Paste the whole of [`schema.txt`](./schema.txt) and run it. It is safe to run again, everything is `IF NOT EXISTS` / `OR REPLACE`.
 3. If you already have an older deployment, also run [`migrations/20261011_branch_hours_and_availability.sql`](./migrations/20261011_branch_hours_and_availability.sql) to add the new branch columns in place.
 4. Also run [`migrations/20261013_user_email_and_business_key.sql`](./migrations/20261013_user_email_and_business_key.sql) (adds `users.email` and `business.key_hash`). Then set the business key once, see [8.14](#814-users-and-password-reset).
+5. Run [`migrations/20261025_kds_notifications.sql`](./migrations/20261025_kds_notifications.sql) to add branch keys (if missing) and KDS device registrations.
 
 ### 2.3 Configure
 
@@ -642,6 +643,43 @@ curl -X POST http://localhost:8000/delivery/quote \
 Response: `{ "delivery_fee": 300, "distance_km": 2.4 }`. The fee is in pence: £3 minimum, covering up to 3 miles, plus 10p for each started 0.1 mile beyond that. The endpoint returns 400 if the address cannot be located or is outside the branch's delivery area. Use `delivery_fee` to display the checkout total and create the Stripe PaymentIntent. When `POST /orders` is submitted, the server recalculates the driving distance and fee and uses that value for the saved order and total; the client-provided `delivery_fee` is not trusted.
 
 `name`, `unit_price` and modifier `name` / `price` are snapshots taken at order time.
+
+### 8.13.1 KDS push notifications
+
+Run the KDS migration listed in [2.2](#22-create-the-tables), then assign a distinct `branch_key` to each
+branch in Supabase. The key is public client configuration used only to associate a device with a branch;
+it is not proof that the app is authentic and must not be treated as a secret.
+Set the exact value configured in the KDS app:
+
+```sql
+UPDATE public.branches
+SET branch_key = '<configured-branch-key>'
+WHERE id = '<branch-id>';
+```
+
+Register an Android tablet with `POST /kds/notifications/register`:
+
+```json
+{
+  "branchKey": "the-configured-branch-key",
+  "deviceId": "android-device-id",
+  "expoPushToken": "ExponentPushToken[device-token]",
+  "platform": "android"
+}
+```
+
+The API validates the Expo token and resolves the key to an active branch before saving the device. Repeated
+registration for the same branch/device refreshes its token and reactivates it. Each active tablet on the
+order's branch receives `NEW ORDER RECEIVED` after the order transaction commits; order updates do not
+send another new-order push. Failed Expo sends are logged without failing the customer order.
+
+Successful Expo tickets are checked for receipts after 15 minutes. A confirmed `DeviceNotRegistered`
+response deactivates that device. Receipt checks are in-memory and best effort: a process restart before the
+check, or a transient receipt-fetch failure, can prevent cleanup until another mechanism retries it. This
+initial implementation does not have a durable notification outbox or retry queue. OS push banners are
+not permanently undismissable; keep unacknowledged orders visible in the KDS app UI if persistence is
+required. An Expo ticket/receipt is not proof that the notification was physically displayed. No backend
+environment variables are required.
 
 ### 8.14 Users and password reset
 

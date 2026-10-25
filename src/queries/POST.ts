@@ -141,6 +141,17 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 RETURNING *;
 `;
 
+const registerKdsNotificationQuery: string = `
+INSERT INTO kds_notifications (branch_id, device_id, expo_push_token, platform)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (branch_id, device_id)
+DO UPDATE SET
+    expo_push_token = EXCLUDED.expo_push_token,
+    platform = EXCLUDED.platform,
+    active = TRUE,
+    updated_at = NOW();
+`;
+
 const createOrderItemQuery: string = `
 INSERT INTO order_items (id, order_id, product_id, offer_id, offer_rule_id, name, quantity, unit_price, total, notes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
@@ -176,6 +187,7 @@ export const POST = {
     OFFER_RULE_GROUP: createOfferRuleGroupQuery,
     OFFER_RULE_MODIFIER: createOfferRuleModifierQuery,
     ORDER: createOrderQuery,
+    KDS_NOTIFICATION: registerKdsNotificationQuery,
     ORDER_ITEM: createOrderItemQuery,
     ORDER_OFFER: createOrderOfferQuery,
     ORDER_ITEM_MODIFIER: createOrderItemModifierQuery,
