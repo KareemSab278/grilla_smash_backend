@@ -327,7 +327,7 @@ export const offerUpdateSchema = z.object({
 // ========================================
 
 export const ORDER_TYPES = ["PICKUP", "DELIVERY"] as const;
-export const ORDER_STATUSES = ["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "CANCELLED"] as const;
+export const ORDER_STATUSES = ["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "CANCELLED", "REFUNDED"] as const;
 
 const optionalShortText = z.string().trim().min(1).nullish();
 

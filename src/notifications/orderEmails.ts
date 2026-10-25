@@ -39,11 +39,11 @@ const ORDER_EMAIL_CONTENT: Partial<Record<OrderStatus, OrderEmailContent>> = {
     },
     CANCELLED: {
         subject: "Your order has been cancelled",
-        body: "has been cancelled. If you paid online you will receive a refund within 12 - 24 hours. If you have any questions, please give our store a call.",
+        body: "has been cancelled. If you have any questions, please give our store a call.",
     },
     REFUNDED: {
         subject: "Your order has been refunded",
-        body: "has been refunded. Please check your account for the refund details.",
+        body: "has been refunded. You should receive the refund within 5 days. Please check your account for the refund details.",
     },
 };
 
