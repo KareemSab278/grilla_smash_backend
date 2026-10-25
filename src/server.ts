@@ -1,6 +1,11 @@
 /*
     ENTRY POINT - BUILDS THE EXPRESS APP AND STARTS LISTENING.
 
+    to run in kds app:
+        'npm run dev' in one terminal and 'cloudflared tunnel --protocol http2 --url http://localhost:8000' in another
+            use the generated url in .env and set it in KDS app.
+                Rebuild then flash new build in dev
+
     Middleware order matters: cors -> rate limiter -> json body parser -> routers -> notFoundHandler -> errorHandler.
     (the limiter sits after cors so a 429 still carries the CORS headers the browser needs to read it)
     Every router is mounted at the root (no /api prefix) because Admin and Frontend call these paths directly.
