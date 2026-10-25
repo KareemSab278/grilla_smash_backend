@@ -4,6 +4,7 @@ dist
 
 generate_business_key.ts
 generate_password_hash.ts
+generate_branch_key.ts
 
 .DS_Store
 
