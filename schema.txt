@@ -31,20 +31,6 @@ CREATE TABLE public.branches (
   branch_key text UNIQUE,
   CONSTRAINT branches_pkey PRIMARY KEY (id)
 );
-CREATE TABLE public.kds_notifications (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  branch_id text NOT NULL,
-  device_id text NOT NULL,
-  expo_push_token text NOT NULL UNIQUE,
-  platform text NOT NULL DEFAULT 'android'::text CHECK (platform = 'android'::text),
-  active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT kds_notifications_pkey PRIMARY KEY (id),
-  CONSTRAINT kds_notifications_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id) ON DELETE CASCADE,
-  CONSTRAINT kds_notifications_branch_device_key UNIQUE (branch_id, device_id)
-);
-CREATE INDEX idx_kds_notifications_branch_active ON public.kds_notifications (branch_id, active);
 CREATE TABLE public.categories (
   id text NOT NULL,
   name text NOT NULL,
@@ -255,4 +241,16 @@ CREATE TABLE public.users (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   email text NOT NULL,
   CONSTRAINT users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.kds_notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  branch_id text NOT NULL,
+  device_id text NOT NULL,
+  expo_push_token text NOT NULL UNIQUE,
+  platform text NOT NULL DEFAULT 'android'::text CHECK (platform = 'android'::text),
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT kds_notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT kds_notifications_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)
 );
