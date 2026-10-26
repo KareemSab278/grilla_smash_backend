@@ -836,6 +836,10 @@ npm test
 
 [`test/schemas.test.ts`](./test/schemas.test.ts) covers the zod request schemas (defaults, trimming, date and email validation, the delivery address rule, price fields being stripped from orders). It needs no database.
 
+[`test/analyticsQueries.test.ts`](./test/analyticsQueries.test.ts) runs analytics SQL and HTTP
+regression tests against an in-memory PostgreSQL-compatible database. Its PGlite dependency is
+development-only and does not require a separate database server.
+
 ### 9.2 End to end smoke test
 
 Start the backend (`npm run dev`) with a working database, then in another terminal:

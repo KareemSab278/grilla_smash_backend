@@ -1,96 +1,81 @@
 import express from "express";
 import type { Request, RequestHandler, Response } from "express";
 import sql, { dbAll } from "../database/db";
-import type { Db } from "../database/db";
-import { getRequiredRow } from "../helpers/helpers";
+import { requireRow } from "../helpers/helpers";
 import { requireBusinessKey } from "../middleware/requireBusinessKey";
 import { QUERIES } from "../queries/queries";
-import {
-    AnalyticsCache, analyticsRange, categorySales, peakSeries, refundedOrderSeries,
-} from "../analytics/analytics";
-import type { AnalyticsRange, CategoryProduct, PeakRow, ProductSales, RefundedOrderDay } from "../analytics/analytics";
+import { AnalyticsCache, analyticsRange } from "../analytics/analytics";
 import type { SqlParam } from "../types";
 
 type Params = { branchId: string };
-type Context = { branchId: string | null; range: AnalyticsRange; params: readonly SqlParam[] };
+type Amounts = { order_count: number; subtotal: number; discount: number; delivery_fee: number; total: number };
 type SalesRow = {
     day: string; order_count: number; subtotal: number; discount: number; delivery_fee: number; total: number;
+    average_order_value: number;
 };
-type OrderRow = { status: string; order_type: string; order_count: number };
+type SalesReport = { summary: Amounts & { average_order_value: number }; days: SalesRow[] };
+type OrdersReport = {
+    by_status: { status: string; order_count: number }[];
+    by_type: { order_type: string; order_count: number }[];
+};
+type RefundsReport = {
+    date_basis: "order_created"; value_basis: "order_total";
+    summary: { refund_count: number; total: number };
+    refunds: { day: string; refund_count: number; total: number }[];
+};
+type HourCount = { hour: number; order_count: number };
+type PeaksReport = {
+    by_weekday: { weekday: number; order_count: number }[];
+    by_hour: HourCount[];
+    heatmap: { weekday: number; hour: number; order_count: number }[];
+    by_month: { month: string; order_count: number; by_hour: HourCount[] }[];
+};
+type ItemSales = { id: string; name: string; active: boolean; quantity: number; item_value: number };
+type ProductsReport = { products: ItemSales[]; categories: ItemSales[] };
 type OfferRow = { offer_id: string | null; name: string; offer_lines: number; discount: number };
 type ModifierRow = { modifier_id: string | null; name: string; quantity: number; item_value: number };
 type DeliveryRow = { postcode_area: string; order_count: number; total: number; delivery_fee: number };
 type BranchRow = { id: string; name: string; active: boolean; order_count: number; total: number };
-type Loader = (context: Context) => Promise<object>;
+type Loader = (params: readonly SqlParam[]) => Promise<object>;
 
-export const createAnalyticsRouter = (db: Db = sql, authenticate: RequestHandler = requireBusinessKey) => {
+export type AnalyticsStore = {
+    all<T extends object>(query: string, params?: readonly SqlParam[]): Promise<T[]>;
+};
+const defaultStore: AnalyticsStore = {
+    all: (query, params) => dbAll(sql, query, params),
+};
+
+export const createAnalyticsRouter = (store: AnalyticsStore = defaultStore, authenticate: RequestHandler = requireBusinessKey) => {
     const router = express.Router();
     const cache = new AnalyticsCache<object>(120_000, 128);
     const branchCache = new AnalyticsCache<void>(120_000, 128);
-    const categoryCache = new AnalyticsCache<CategoryProduct[]>(120_000, 1);
 
-    const sales: Loader = async ({ params }) => {
-        const days = await dbAll<SalesRow>(db, QUERIES.ANALYTICS.SALES, params);
-        const summary = days.reduce(
-            (sum, day) => ({
-                order_count: sum.order_count + day.order_count,
-                subtotal: sum.subtotal + day.subtotal,
-                discount: sum.discount + day.discount,
-                delivery_fee: sum.delivery_fee + day.delivery_fee,
-                total: sum.total + day.total,
-            }),
-            { order_count: 0, subtotal: 0, discount: 0, delivery_fee: 0, total: 0 }
-        );
-        return {
-            summary: { ...summary, average_order_value: summary.order_count ? Math.round(summary.total / summary.order_count) : 0 },
-            days: days.map(day => ({
-                ...day, average_order_value: Math.round(day.total / day.order_count),
-            })),
-        };
+    const getReport = async <T extends object>(query: string, params: readonly SqlParam[]): Promise<T> => {
+        const [report] = await store.all<T>(query, params);
+        if (!report) throw new Error("Analytics query returned no report");
+        return report;
     };
 
-    const orders: Loader = async ({ params }) => {
-        const rows = await dbAll<OrderRow>(db, QUERIES.ANALYTICS.ORDERS, params);
-        const statuses = new Map<string, number>();
-        const types = new Map<string, number>([["PICKUP", 0], ["DELIVERY", 0]]);
-        for (const row of rows) {
-            statuses.set(row.status, (statuses.get(row.status) ?? 0) + row.order_count);
-            if (row.status === "COMPLETED" || row.status === "COMPLETED (PARTIAL REFUND)") {
-                types.set(row.order_type, (types.get(row.order_type) ?? 0) + row.order_count);
-            }
-        }
-        return {
-            by_status: [...statuses].map(([status, order_count]) => ({ status, order_count })),
-            by_type: [...types].map(([order_type, order_count]) => ({ order_type, order_count })),
-        };
-    };
-    const refunds: Loader = async ({ params }) =>
-        refundedOrderSeries(await dbAll<RefundedOrderDay>(db, QUERIES.ANALYTICS.REFUNDS, params));
+    const sales: Loader = params => getReport<SalesReport>(QUERIES.ANALYTICS.SALES, params);
+    const orders: Loader = params => getReport<OrdersReport>(QUERIES.ANALYTICS.ORDERS, params);
+    const refunds: Loader = params => getReport<RefundsReport>(QUERIES.ANALYTICS.REFUNDS, params);
+    const peaks: Loader = params => getReport<PeaksReport>(QUERIES.ANALYTICS.PEAKS, params);
+    const products: Loader = params => getReport<ProductsReport>(QUERIES.ANALYTICS.PRODUCTS, params);
 
-    const peaks: Loader = async ({ params }) => peakSeries(await dbAll<PeakRow>(db, QUERIES.ANALYTICS.PEAKS, params));
-
-    const products: Loader = async ({ params }) => {
-        const [items, categories] = await Promise.all([
-            dbAll<ProductSales>(db, QUERIES.ANALYTICS.PRODUCTS, params),
-            categoryCache.get("categories", () => dbAll<CategoryProduct>(db, QUERIES.ANALYTICS.CATEGORY_PRODUCTS)),
-        ]);
-        return { products: items, categories: categorySales(items, categories) };
-    };
-
-    const offers: Loader = async ({ params }) => ({
-        offers: await dbAll<OfferRow>(db, QUERIES.ANALYTICS.OFFERS, params),
+    const offers: Loader = async params => ({
+        offers: await store.all<OfferRow>(QUERIES.ANALYTICS.OFFERS, params),
     });
 
-    const modifiers: Loader = async ({ params }) => ({
-        modifiers: await dbAll<ModifierRow>(db, QUERIES.ANALYTICS.MODIFIERS, params),
+    const modifiers: Loader = async params => ({
+        modifiers: await store.all<ModifierRow>(QUERIES.ANALYTICS.MODIFIERS, params),
     });
 
-    const delivery: Loader = async ({ params }) => ({
-        areas: await dbAll<DeliveryRow>(db, QUERIES.ANALYTICS.DELIVERY, params),
+    const delivery: Loader = async params => ({
+        areas: await store.all<DeliveryRow>(QUERIES.ANALYTICS.DELIVERY, params),
     });
 
-    const branches: Loader = async ({ params }) => ({
-        branches: await dbAll<BranchRow>(db, QUERIES.ANALYTICS.BRANCHES, params),
+    const branches: Loader = async params => ({
+        branches: await store.all<BranchRow>(QUERIES.ANALYTICS.BRANCHES, params),
     });
 
     const respond = async (req: Request, res: Response, endpoint: string, branchId: string | null, load: Loader) => {
@@ -99,7 +84,8 @@ export const createAnalyticsRouter = (db: Db = sql, authenticate: RequestHandler
         const data = await cache.get(key, async () => {
             if (branchId !== null) {
                 await branchCache.get(branchId, async () => {
-                    await getRequiredRow<{ id: string }>(db, QUERIES.ANALYTICS.BRANCH_EXISTS, branchId, "branch");
+                    const [branch] = await store.all<{ id: string }>(QUERIES.ANALYTICS.BRANCH_EXISTS, [branchId]);
+                    requireRow(branch, "branch");
                 });
             }
             const params: readonly SqlParam[] = [branchId, range.from, range.to];
@@ -108,7 +94,7 @@ export const createAnalyticsRouter = (db: Db = sql, authenticate: RequestHandler
                 range,
                 timezone: "Europe/London",
                 generated_at: new Date().toISOString(),
-                ...(await load({ branchId, range, params })),
+                ...(await load(params)),
             };
         });
         res.set("Cache-Control", "private, no-store");

@@ -17,11 +17,10 @@ do not embed the key in browser or mobile application code. There is no per-bran
 - Each response includes `branch_id` (null means all branches), `range: { from, to }`, `timezone`,
   and `generated_at`. Examples below shorten arrays where noted.
 - Data is cached per backend instance for two minutes after a successful query, with concurrent
-  identical requests coalesced. Branch-existence checks and category mappings have their own
-  two-minute caches shared across reports. A report generated just before one of those caches
-  expires may therefore reflect branch or category changes up to four minutes late.
-  `generated_at` indicates when the report was generated, not necessarily when its cached
-  category mapping was loaded. HTTP responses are marked `private, no-store`.
+  identical requests coalesced. Branch-existence checks have a separate two-minute cache shared
+  across reports; a report generated just before it expires may therefore reflect a branch deletion
+  up to four minutes late. `generated_at` indicates when the report was generated. HTTP responses
+  are marked `private, no-store`.
 - Invalid dates, partial ranges, ranges longer than 366 days and unknown query parameters return
   422 with `{ "detail": "..." }`; a missing or invalid business key returns 401.
 
@@ -282,11 +281,12 @@ normal writes: run each statement separately in autocommit mode, outside a trans
 index build is interrupted, inspect for an invalid index and remove it before retrying.
 
 Every report filters by an indexed date range before aggregation and returns grouped rows rather
-than raw customer orders. Branch reports also filter on branch ID. Product/category charts share
-one order-item aggregation; each other chart makes one report query, plus business-key checks.
-Branch validation and product category mappings are cached across reports. The bounded caches
-reduce repeat work, but a first request per report and period still runs a query. Index builds
-consume resources and add write/storage
+than raw customer orders. Branch reports also filter on branch ID. SQL calculates the report
+summaries and chart buckets; product/category charts share one order-item aggregation. Each
+report makes one report query, plus business-key checks. Branch validation is cached across
+reports. The bounded caches reduce repeat work, but a first request per report and period still
+runs a query. Moving calculations to SQL shifts that work to Postgres, rather than eliminating
+it. Index builds consume resources and add write/storage
 overhead. Test representative queries with `EXPLAIN (ANALYZE, BUFFERS)` on an appropriate
 staging dataset before enabling frequent dashboard refreshes; this design cannot guarantee a
 particular CPU cost on an unknown dataset. Longer-term rollups can be added if needed.
