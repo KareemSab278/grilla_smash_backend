@@ -5,11 +5,11 @@
     - 100 requests per minute
     Exceeding either limit blocks every request in this process for 60 seconds.
 */
-
+import { CONFIG } from "../config";
 import type { RequestHandler } from "express";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 
-const dev = process.env.NODE_ENV === "development";
+const dev = CONFIG.isDevelopment;
 
 const MAX_REQUESTS_PER_SECOND = 30 * (dev ? 10 : 1);
 const MAX_REQUESTS_PER_MINUTE = 100 * (dev ? 10 : 1);

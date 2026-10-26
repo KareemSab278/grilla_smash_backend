@@ -61,7 +61,7 @@ const errorResponse = (res: Response, error: string, err: unknown) => {
 };
 
 const stripeLog = (event: string, details: Record<string, unknown>): void => {
-    if (process.env.NODE_ENV !== "development") return;
+    if (!CONFIG.isDevelopment) return;
     console.info(`[stripe] ${event}`, details);
 };
 
