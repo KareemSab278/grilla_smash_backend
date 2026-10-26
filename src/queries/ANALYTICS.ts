@@ -63,18 +63,9 @@ SELECT coalesce((SELECT json_agg(statuses ORDER BY status) FROM statuses), '[]':
 `;
 
 const REFUNDS = `
-WITH days AS (
-    SELECT to_char(o.created_at AT TIME ZONE 'Europe/London', 'YYYY-MM-DD') AS day,
-           count(*)::float8 AS refund_count, sum(o.total)::float8 AS total
-    FROM orders o
-    WHERE ${branch} AND ${bounds} AND o.status = 'REFUNDED'
-    GROUP BY 1
-)
-SELECT 'order_created'::text AS date_basis, 'order_total'::text AS value_basis,
-       json_build_object('refund_count', coalesce(sum(refund_count), 0)::float8,
-                         'total', coalesce(sum(total), 0)::float8) AS summary,
-       coalesce(json_agg(days ORDER BY day), '[]'::json) AS refunds
-FROM days;
+SELECT count(*)::float8 AS refund_count
+FROM orders o
+WHERE ${branch} AND ${bounds} AND o.status = 'REFUNDED';
 `;
 
 const PEAKS = `

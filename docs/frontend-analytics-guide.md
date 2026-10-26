@@ -44,7 +44,7 @@ curl 'https://example.com/analytics/sales/BRANCH_ID?from=2026-01-01&to=2026-10-2
 |---|---|
 | `/analytics/sales/:branchId` | Daily sales line; total sales, completed orders and average-order-value cards; weekly/monthly sales and average-order-value lines derived from daily data |
 | `/analytics/orders/:branchId` | Delivery vs pickup donut; current-status bar chart |
-| `/analytics/refunds/:branchId` | Refunded-order count or order value by day as a line or bar chart; summary cards for both totals |
+| `/analytics/refunds/:branchId` | Refunded-order count summary card for the selected date range |
 | `/analytics/peak-times/:branchId` | Weekday/hour heatmap; hourly and weekday bar charts; monthly/hour heatmap to compare peak hours throughout a year |
 | `/analytics/products/:branchId` | All product quantities and item values as sortable bar charts; all category quantities and item values as sortable bar charts |
 | `/analytics/categories/:branchId` | Alias of the products endpoint, returning the same products and categories data |
@@ -117,27 +117,17 @@ includes both types, even when their counts are zero.
   "range": { "from": "2026-01-01", "to": "2026-01-31" },
   "timezone": "Europe/London",
   "generated_at": "2026-02-01T12:00:00.000Z",
-  "date_basis": "order_created",
-  "value_basis": "order_total",
-  "summary": { "refund_count": 2, "total": 2500 },
-  "refunds": [
-    { "day": "2026-01-10", "refund_count": 1, "total": 1500 },
-    { "day": "2026-01-20", "refund_count": 1, "total": 1000 }
-  ]
+  "refund_count": 2
 }
 ```
 
-Use a line or bar chart with `day` on the horizontal axis and `refund_count` or `total` on the
-vertical axis. Label the chart **"Refunded orders by order creation date"** and label `total`
-**"Refunded order value"**. Fill missing days with zero; an empty period returns an empty
-`refunds` array and zero summary values.
+Display `refund_count` in a summary card labelled **"Refunded orders"**. The count is zero when
+no matching orders exist. No daily breakdown or order values are returned.
 
-This counts orders **currently** marked exactly `REFUNDED`, grouped by when the order was
-created—not when it was refunded. Partial-refund statuses are excluded. The value is the sum of
-those orders' original `total` fields, not the amount refunded in the period. A refund that
-happens later can change a past period's chart. The database does not store a complete, dated
-refund-event history, so this report must not be presented as actual refunded amounts or net
-revenue.
+This counts orders **currently** marked exactly `REFUNDED`, filtered by when the order was
+created—not when it was refunded. Partial-refund statuses are excluded. A refund that happens
+later can change a past period's count. The database does not store a complete, dated refund-event
+history, so this count is not the number of refund events that occurred in the period.
 
 ## Peak times
 

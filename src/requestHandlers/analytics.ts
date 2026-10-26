@@ -18,11 +18,7 @@ type OrdersReport = {
     by_status: { status: string; order_count: number }[];
     by_type: { order_type: string; order_count: number }[];
 };
-type RefundsReport = {
-    date_basis: "order_created"; value_basis: "order_total";
-    summary: { refund_count: number; total: number };
-    refunds: { day: string; refund_count: number; total: number }[];
-};
+type RefundsReport = { refund_count: number };
 type HourCount = { hour: number; order_count: number };
 type PeaksReport = {
     by_weekday: { weekday: number; order_count: number }[];

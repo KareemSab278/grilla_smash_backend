@@ -17,10 +17,7 @@ type Orders = {
     by_status: { status: string; order_count: number }[];
     by_type: { order_type: string; order_count: number }[];
 };
-type Refunds = {
-    date_basis: string; value_basis: string; summary: { refund_count: number; total: number };
-    refunds: { day: string; refund_count: number; total: number }[];
-};
+type Refunds = { refund_count: number };
 type Hour = { hour: number; order_count: number };
 type Peaks = {
     by_weekday: { weekday: number; order_count: number }[];
@@ -109,21 +106,15 @@ test("order SQL returns status and completed-only type counts, including zero ty
     });
 });
 
-test("refund SQL counts only currently refunded orders by order date and original value", async () => {
+test("refund SQL counts only currently refunded orders created within the selected date range", async () => {
     const { rows } = await db.query<Refunds>(ANALYTICS.REFUNDS, ["b1", "2026-03-29", "2026-03-30"]);
-    assert.deepEqual(rows[0], {
-        date_basis: "order_created", value_basis: "order_total",
-        summary: { refund_count: 2, total: 878 },
-        refunds: [
-            { day: "2026-03-29", refund_count: 1, total: 777 },
-            { day: "2026-03-30", refund_count: 1, total: 101 },
-        ],
-    });
+    assert.deepEqual(rows[0], { refund_count: 2 });
+    const singleDay = await db.query<Refunds>(ANALYTICS.REFUNDS, ["b1", "2026-03-29", "2026-03-29"]);
+    assert.deepEqual(singleDay.rows[0], { refund_count: 1 });
     const all = await db.query<Refunds>(ANALYTICS.REFUNDS, [null, "2026-03-29", "2026-03-29"]);
-    assert.deepEqual(all.rows[0]?.summary, { refund_count: 2, total: 977 });
+    assert.deepEqual(all.rows[0], { refund_count: 2 });
     const empty = await db.query<Refunds>(ANALYTICS.REFUNDS, ["b1", "2026-01-01", "2026-01-01"]);
-    assert.deepEqual(empty.rows[0]?.summary, { refund_count: 0, total: 0 });
-    assert.deepEqual(empty.rows[0]?.refunds, []);
+    assert.deepEqual(empty.rows[0], { refund_count: 0 });
 });
 
 test("peak SQL preserves heatmap, hourly and monthly counts over daylight-saving change", async () => {
@@ -218,6 +209,12 @@ test("HTTP analytics routes return SQL reports and share branch and alias caches
         assert.deepEqual(salesBody.summary, {
             order_count: 2, subtotal: 1500, discount: 200, delivery_fee: 100, total: 1400, average_order_value: 700,
         });
+        const refundBody: unknown = await refunds.json();
+        assert.ok(refundBody && typeof refundBody === "object" && "refund_count" in refundBody);
+        assert.equal(refundBody.refund_count, 1);
+        assert.deepEqual(Object.keys(refundBody).sort(), [
+            "branch_id", "generated_at", "range", "refund_count", "timezone",
+        ]);
         const productsBody: unknown = await products.json();
         assert.deepEqual(await categories.json(), productsBody);
         assert.equal(calls.filter(query => query === ANALYTICS.BRANCH_EXISTS).length, 1);
