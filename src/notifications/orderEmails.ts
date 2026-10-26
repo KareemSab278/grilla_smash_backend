@@ -15,7 +15,7 @@ type OrderStatusUpdates =
     "ACCEPTED"  |
     "PREPARING" |
     "READY"     |
-    "COMPLETED" |
+    // "COMPLETED" |
     "CANCELLED" |
     "REFUNDED";
 
@@ -41,10 +41,10 @@ const ORDER_EMAIL_CONTENT: Partial<Record<OrderStatusUpdates, OrderEmailContent>
         subject: "Your order is ready",
         body: "is now ready for pickup or delivery.",
     },
-    COMPLETED: {
-        subject: "Your order is complete",
-        body: "has been completed. Thank you for choosing us!",
-    },
+    // COMPLETED: {
+    //     subject: "Your order is complete",
+    //     body: "has been completed. Thank you for choosing us!",
+    // },
     CANCELLED: {
         subject: "Your order has been cancelled",
         body: "has been cancelled. If you have any questions, please give our store a call.",
