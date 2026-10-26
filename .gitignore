@@ -9,3 +9,5 @@ generate_branch_key.ts
 .DS_Store
 
 *.sql
+!migrations/20261026_analytics_indexes.sql
+migrations/*.sql

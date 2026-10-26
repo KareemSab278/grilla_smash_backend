@@ -36,6 +36,7 @@ import payment from "./requestHandlers/payment";
 import users from "./requestHandlers/users";
 import images from "./requestHandlers/images";
 import kdsNotifications from "./requestHandlers/kdsNotifications";
+import analytics from "./requestHandlers/analytics";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -63,6 +64,7 @@ app.use(payment);
 app.use(users);
 app.use(images);
 app.use(kdsNotifications);
+app.use(analytics);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

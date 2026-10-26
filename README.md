@@ -27,6 +27,8 @@ A generic online-ordering API (menu, branches, offers, orders) written in strict
    - [8.13 Orders](#813-orders)
    - [8.14 Users and password reset](#814-users-and-password-reset)
    - [8.15 Payments](#815-payments)
+   - [8.16 Images](#816-images)
+   - [8.17 Analytics](#817-analytics)
 9. [Testing](#9-testing)
 10. [Adding a new endpoint](#10-adding-a-new-endpoint)
 11. [Security notes](#11-security-notes)
@@ -66,6 +68,7 @@ Money is always an **integer in pence** (`£8.99` is `899`). Ids are 12 characte
 3. If you already have an older deployment, also run [`migrations/20261011_branch_hours_and_availability.sql`](./migrations/20261011_branch_hours_and_availability.sql) to add the new branch columns in place.
 4. Also run [`migrations/20261013_user_email_and_business_key.sql`](./migrations/20261013_user_email_and_business_key.sql) (adds `users.email` and `business.key_hash`). Then set the business key once, see [8.14](#814-users-and-password-reset).
 5. Run [`migrations/20261025_kds_notifications.sql`](./migrations/20261025_kds_notifications.sql) to add branch keys (if missing) and KDS device registrations.
+6. For analytics, run each statement of [`migrations/20261026_analytics_indexes.sql`](./migrations/20261026_analytics_indexes.sql) separately outside a transaction. The concurrent indexes support the analytics date and join lookups.
 
 ### 2.3 Configure
 
@@ -813,6 +816,13 @@ Successful refunds return `{ "success": true, "refund_id", "amount", "currency",
 | DELETE | `/images/:entityType/:entityId` | Clears one product/category image and removes its managed bucket file |
 
 All image routes require `BRANCH_SETTINGS_AUTH_ENABLED=true` and an active ADMIN or MANAGER user. Bucket usage is the total of the file sizes returned by Supabase Storage; external writes can bypass the application's quota lock.
+
+### 8.17 Analytics
+
+The business-key-protected `/analytics` endpoints provide completed-order sales, refunded orders,
+products and categories, peak times, offers, modifiers, delivery areas and branch comparisons. See the
+[frontend analytics guide](./docs/frontend-analytics-guide.md) for endpoints, response examples,
+chart recommendations, date ranges and important payment/refund limitations.
 
 ---
 
