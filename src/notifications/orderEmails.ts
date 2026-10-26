@@ -10,8 +10,14 @@ import sql, { dbGet } from "../database/db";
 import { sendEmail } from "./email";
 import { CONFIG } from "../config";
 
-type OrderStatusUpdates = "ACCEPTED" | "PREPARING" |
-    "READY" | "COMPLETED" | "CANCELLED" | "REFUNDED";
+type OrderStatusUpdates =
+    // "PENDING" |
+    "ACCEPTED"  |
+    "PREPARING" |
+    "READY"     |
+    "COMPLETED" |
+    "CANCELLED" |
+    "REFUNDED";
 
 type OrderEmailContent = {
     subject: string;
@@ -19,6 +25,10 @@ type OrderEmailContent = {
 };
 
 const ORDER_EMAIL_CONTENT: Partial<Record<OrderStatusUpdates, OrderEmailContent>> = {
+    // PENDING: {
+    //     subject: "Your order has been received",
+    //     body: "has been received and is now being processed. We will notify you when it's ready. Thank you!",
+    // },
     ACCEPTED: {
         subject: "Your order has been accepted",
         body: "has been accepted by the store. We will notify you when it's being prepared.",
