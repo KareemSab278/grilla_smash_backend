@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { associateUploadedImage } from "../src/imageHandler/imageAssociation";
+import { associateUploadedImage } from "../src/images/imageAssociation";
 
 const uploaded = { path: "products/new.webp", publicUrl: "https://storage.test/new.webp" };
 

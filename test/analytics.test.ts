@@ -28,6 +28,17 @@ test("analytics ranges accept one leap year and reject invalid, partial or overs
     ]) assert.throws(() => analyticsRange(input), { status: 422 });
 });
 
+test("analytics ranges accept the inclusive one-day and 366-day boundaries", () => {
+    assert.deepEqual(analyticsRange({ from: "2024-02-29", to: "2024-02-29" }), {
+        from: "2024-02-29", to: "2024-02-29",
+    });
+    assert.deepEqual(analyticsRange({ from: "2024-01-01", to: "2024-12-31" }), {
+        from: "2024-01-01", to: "2024-12-31",
+    });
+    assert.throws(() => analyticsRange({ from: "2023-01-01", to: "2024-01-02" }), { status: 422 });
+    assert.throws(() => analyticsRange({ from: "2023-02-29", to: "2023-03-01" }), { status: 422 });
+});
+
 test("cache coalesces requests, expires, evicts, and does not cache errors", async () => {
     const cache = new AnalyticsCache<number>(50, 1);
     let calls = 0;
@@ -43,4 +54,21 @@ test("cache coalesces requests, expires, evicts, and does not cache errors", asy
     assert.equal(await cache.get("a", load), 4);
     await assert.rejects(cache.get("error", async () => { throw new Error("DB unavailable"); }));
     assert.equal(await cache.get("error", load), 5);
+});
+
+test("cache refreshes least-recently-used entries and preserves pending coalescing", async () => {
+    const cache = new AnalyticsCache<number>(1000, 2);
+    let calls = 0;
+    let resolveLoad: ((value: number) => void) | undefined;
+    const pending = new Promise<number>(resolve => { resolveLoad = resolve; });
+
+    const first = cache.get("a", () => pending);
+    assert.equal(cache.get("a", () => Promise.resolve(++calls)), first);
+    resolveLoad?.(1);
+    assert.equal(await first, 1);
+
+    await cache.get("b", async () => ++calls);
+    await cache.get("a", async () => ++calls);
+    await cache.get("c", async () => ++calls);
+    assert.equal(await cache.get("b", async () => ++calls), 3);
 });

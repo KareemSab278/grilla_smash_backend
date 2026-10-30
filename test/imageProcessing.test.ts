@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
-import { HttpError } from "../src/errors";
-import { MAX_IMAGE_OUTPUT_BYTES, MAX_IMAGE_SIZE_BYTES, processImage } from "../src/imageHandler/imageProcessing";
+import { HttpError } from "../src/helpers/errors";
+import { MAX_IMAGE_OUTPUT_BYTES, MAX_IMAGE_SIZE_BYTES, processImage } from "../src/images/imageProcessing";
 import {
     assertWithinBucketQuota,
     MAX_BUCKET_SIZE_BYTES,
     projectedBucketUsage,
     withLocalBucketQuotaLock,
-} from "../src/imageHandler/imageQuota";
+} from "../src/images/imageQuota";
 
 const makeJpeg = async (width = 1200, height = 800): Promise<Buffer> =>
     sharp({

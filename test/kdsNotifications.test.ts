@@ -136,6 +136,36 @@ test("DeviceNotRegistered receipts deactivate only their associated device", asy
     assert.deepEqual(calls[0]?.params, ["device-a"]);
 });
 
+test("DeviceNotRegistered tickets deactivate only their associated device", async () => {
+    const { dispatchKdsNewOrderNotification } = await notificationService;
+    const { db, calls } = makeDb([
+        { id: "device-a", expo_push_token: tokenA },
+        { id: "device-b", expo_push_token: tokenB },
+    ]);
+    const sent: ExpoPushMessage[] = [];
+    const client = makeExpoClient(sent, async messages =>
+        messages.map((_, index) =>
+            index === 0
+                ? {
+                    status: "error",
+                    message: "Device not registered",
+                    details: { error: "DeviceNotRegistered" },
+                }
+                : { status: "ok", id: "receipt-2" }
+        )
+    );
+
+    await dispatchKdsNewOrderNotification(db, client, {
+        id: "order-3",
+        branch_id: "walsall",
+        order_number: 44,
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1]?.query, PATCH.KDS_NOTIFICATION_DEACTIVATE);
+    assert.deepEqual(calls[1]?.params, ["device-a"]);
+});
+
 test("Expo send failures do not reject the already-created order flow", async () => {
     const { dispatchKdsNewOrderNotification } = await notificationService;
     const { db } = makeDb([{ id: "device-a", expo_push_token: tokenA }]);

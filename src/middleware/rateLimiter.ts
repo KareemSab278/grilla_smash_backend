@@ -73,8 +73,9 @@ export const createRateLimiterMiddleware = (dependencies: RateLimiterDeps = defa
                 return;
             }
 
-            res.set("Retry-After", String(activateGlobalBlock(dependencies)));
-            res.status(429).json({ detail: "Too many requests - Please wait " + String(activateGlobalBlock(dependencies)) + " seconds" });
+            const retryAfterSeconds = activateGlobalBlock(dependencies);
+            res.set("Retry-After", String(retryAfterSeconds));
+            res.status(429).json({ detail: "Too many requests - Please wait " + retryAfterSeconds + " seconds" });
             return;
         }
 
@@ -86,8 +87,9 @@ export const createRateLimiterMiddleware = (dependencies: RateLimiterDeps = defa
                 return;
             }
 
-            res.set("Retry-After", String(activateGlobalBlock(dependencies)));
-            res.status(429).json({ detail: "Too many requests - Please wait " + String(activateGlobalBlock(dependencies)) + " seconds" });
+            const retryAfterSeconds = activateGlobalBlock(dependencies);
+            res.set("Retry-After", String(retryAfterSeconds));
+            res.status(429).json({ detail: "Too many requests - Please wait " + retryAfterSeconds + " seconds" });
             return;
         }
 

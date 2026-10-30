@@ -17,8 +17,8 @@ import {
     orderCreateSchema,
     orderStatusUpdateSchema,
     productListQuerySchema,
-} from "../src/schemas";
-import { DEFAULT_OPENING_HOURS, mergeOpeningHours } from "../src/branchHours";
+} from "../src/database/schemas";
+import { DEFAULT_OPENING_HOURS, mergeOpeningHours } from "../src/branches/branchHours";
 
 const validOrder = {
     branch_id: "b1",
@@ -54,40 +54,59 @@ test("businessCreateSchema trims fields and defaults currency", () => {
         logo_url: null,
     });
 
-    test("openingHoursSchema validates times and defaults closed flag", () => {
-        const parsed = openingHoursSchema.parse(DEFAULT_OPENING_HOURS);
-
-        assert.equal(parsed.monday.is_closed, false);
-        assert.throws(
-            () =>
-                openingHoursSchema.parse({
-                    ...DEFAULT_OPENING_HOURS,
-                    monday: { open: "25:00", close: "17:00" },
-                }),
-            /Invalid time/
-        );
-    });
-
-    test("openingHoursPatchSchema supports partial day updates and mergeOpeningHours preserves other days", () => {
-        const patch = openingHoursPatchSchema.parse({
-            monday: { open: "10:00" },
-            sunday: { is_closed: true },
-        });
-
-        const merged = mergeOpeningHours(DEFAULT_OPENING_HOURS, patch);
-
-        assert.equal(merged.monday.open, "10:00");
-        assert.equal(merged.monday.close, "17:00");
-        assert.equal(merged.tuesday.open, "09:00");
-        assert.equal(merged.sunday.is_closed, true);
-    });
-
     assert.deepEqual(parsed, {
         name: "test",
         slug: "test-api",
         logo_url: null,
         currency: "GBP",
     });
+});
+
+test("openingHoursSchema validates times and defaults closed flag", () => {
+    const parsed = openingHoursSchema.parse(DEFAULT_OPENING_HOURS);
+
+    assert.equal(parsed.monday.is_closed, false);
+    assert.throws(
+        () =>
+            openingHoursSchema.parse({
+                ...DEFAULT_OPENING_HOURS,
+                monday: { open: "25:00", close: "17:00" },
+            }),
+        /Invalid time/
+    );
+});
+
+test("openingHoursPatchSchema supports partial day updates and mergeOpeningHours preserves other days", () => {
+    const patch = openingHoursPatchSchema.parse({
+        monday: { open: "10:00" },
+        sunday: { is_closed: true },
+    });
+
+    const merged = mergeOpeningHours(DEFAULT_OPENING_HOURS, patch);
+
+    assert.equal(merged.monday.open, "10:00");
+    assert.equal(merged.monday.close, "17:00");
+    assert.equal(merged.tuesday.open, "09:00");
+    assert.equal(merged.sunday.is_closed, true);
+});
+
+test("opening hours merging handles time changes, closed flags, and does not mutate input", () => {
+    const current = {
+        ...DEFAULT_OPENING_HOURS,
+        monday: { open: "08:00", close: "18:00", is_closed: true },
+    };
+    const patch = {
+        monday: { open: "09:00" },
+        tuesday: { close: "19:00" },
+        wednesday: { is_closed: true },
+    };
+
+    const merged = mergeOpeningHours(current, patch);
+
+    assert.deepEqual(merged.monday, { open: "09:00", close: "18:00", is_closed: false });
+    assert.deepEqual(merged.tuesday, { open: "09:00", close: "19:00", is_closed: false });
+    assert.deepEqual(merged.wednesday, { open: "09:00", close: "17:00", is_closed: true });
+    assert.deepEqual(current.monday, { open: "08:00", close: "18:00", is_closed: true });
 });
 
 test("productListQuerySchema accepts boolean-like query values", () => {

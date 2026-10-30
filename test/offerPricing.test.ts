@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { freeItems, priceBundle } from "../src/offerPricing";
-import { orderCreateSchema } from "../src/schemas";
+import { freeItems, isOfferAvailable, priceBundle } from "../src/payment/offerPricing";
+import { orderCreateSchema } from "../src/database/schemas";
 import type { OfferResponse, OrderPricingProductRow } from "../src/types";
 
 const date = new Date("2026-01-01T00:00:00Z");
@@ -257,4 +257,140 @@ test("BUY_X_GET_Y gives one free unit per full set of rule.quantity", () => {
 test("an order may contain only offers, but not nothing", () => {
     assert.doesNotThrow(() => bundle());
     assert.throws(() => orderCreateSchema.parse({ branch_id: "b1", customer_name: "Jo" }));
+});
+
+test("isOfferAvailable treats boundary timestamps as available", () => {
+    const starts = new Date("2026-06-01T12:00:00Z");
+    const ends = new Date("2026-06-01T13:00:00Z");
+    const offer = makeOffer({ starts_at: starts, ends_at: ends });
+
+    assert.equal(isOfferAvailable(offer, starts), true);
+    assert.equal(isOfferAvailable(offer, ends), true);
+    assert.equal(isOfferAvailable(offer, new Date("2026-06-01T11:59:59Z")), false);
+    assert.equal(isOfferAvailable(offer, new Date("2026-06-01T13:00:01Z")), false);
+});
+
+test("priceBundle rejects unknown and duplicate rules", () => {
+    assert.throws(
+        () => priceBundle(makeOffer(), bundle({ rules: [...bundle().rules, { offer_rule_id: "unknown", items: [{ product_id: "burger" }] }] }), products, now),
+        /does not belong/
+    );
+    assert.throws(
+        () => priceBundle(makeOffer(), bundle({ rules: [...bundle().rules, { offer_rule_id: "main", items: [{ product_id: "burger" }] }] }), products, now),
+        /listed more than once/
+    );
+});
+
+test("priceBundle rejects missing offer pricing fields", () => {
+    assert.throws(
+        () => priceBundle(makeOffer({ price: null }), bundle(), products, now),
+        /has no price set/
+    );
+    assert.throws(
+        () => priceBundle(makeOffer({ type: "PERCENTAGE", percentage: null, price: null }), bundle(), products, now),
+        /has no percentage set/
+    );
+    assert.throws(
+        () => priceBundle(makeOffer({ type: "FIXED_DISCOUNT", discount_amount: null, price: null }), bundle(), products, now),
+        /has no discount amount set/
+    );
+});
+
+test("priceBundle rounds percentage discounts and never creates a negative discount", () => {
+    const percentage = priceBundle(
+        makeOffer({ type: "PERCENTAGE", percentage: 33, price: null }),
+        bundle(),
+        products,
+        now
+    );
+    assert.equal(percentage.discount, 363);
+
+    const noDiscount = priceBundle(
+        makeOffer({ type: "FIXED_PRICE", price: 5000 }),
+        bundle(),
+        products,
+        now
+    );
+    assert.equal(noDiscount.discount, 0);
+});
+
+test("priceBundle rejects inactive modifiers, duplicate selections, and group limits", () => {
+    const inactiveModifierOffer = makeOffer({
+        rules: [{
+            ...makeOffer().rules[0]!,
+            modifier_groups: [{
+                id: "size",
+                name: "Size",
+                required: false,
+                min_selections: 0,
+                max_selections: 1,
+                sort_order: 0,
+                active: true,
+                created_at: date,
+                updated_at: date,
+                modifiers: [{
+                    id: "disabled",
+                    modifier_group_id: "size",
+                    name: "Disabled",
+                    price: 10,
+                    sort_order: 0,
+                    active: false,
+                    created_at: date,
+                    updated_at: date,
+                }],
+            }],
+        }, makeOffer().rules[1]!],
+    });
+
+    assert.throws(
+        () => priceBundle(inactiveModifierOffer, bundle({
+            rules: [
+                { offer_rule_id: "main", items: [{ product_id: "burger", modifier_ids: ["disabled"] }] },
+                { offer_rule_id: "side", items: [{ product_id: "fries", modifier_ids: ["small"] }] },
+            ],
+        }), products, now),
+        /not available/
+    );
+    assert.throws(
+        () => priceBundle(makeOffer(), bundle({
+            rules: [
+                { offer_rule_id: "main", items: [{ product_id: "burger" }] },
+                { offer_rule_id: "side", items: [{ product_id: "fries", modifier_ids: ["small", "small"] }] },
+            ],
+        }), products, now),
+        /Duplicate modifiers/
+    );
+});
+
+test("freeItems handles multiple rules, offers, and exact quantity boundaries", () => {
+    const offer = makeOffer({
+        type: "BUY_X_GET_Y",
+        price: null,
+        rules: [
+            { ...makeOffer().rules[0]!, quantity: 2 },
+            { ...makeOffer().rules[1]!, quantity: 3 },
+        ],
+    });
+    const secondOffer = makeOffer({
+        id: "second",
+        type: "BUY_X_GET_Y",
+        price: null,
+        rules: [{ ...makeOffer().rules[0]!, id: "second-rule", quantity: 2 }],
+    });
+
+    const result = freeItems(
+        [offer, secondOffer],
+        [
+            { productId: "burger", name: "Burger", quantity: 4, unitPrice: 800 },
+            { productId: "fries", name: "Fries", quantity: 3, unitPrice: 300 },
+            { productId: "cola", name: "Cola", quantity: 1, unitPrice: 200 },
+        ],
+        now
+    );
+
+    assert.deepEqual(result, [
+        { offerId: "meal", ruleId: "main", productId: "burger", name: "Burger", quantity: 2 },
+        { offerId: "meal", ruleId: "side", productId: "cola", name: "Cola", quantity: 1 },
+        { offerId: "second", ruleId: "second-rule", productId: "burger", name: "Burger", quantity: 2 },
+    ]);
 });

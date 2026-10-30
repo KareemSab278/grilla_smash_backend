@@ -7,15 +7,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { hashKey, keysMatch } from "../src/keys";
-import { hashPassword, verifyPassword } from "../src/passwords";
-import { consumeResetCode, discardResetCode, issueResetCode, RESET_WINDOW_MS } from "../src/passwordResets";
+import { hashKey, keysMatch } from "../src/security/keys";
+import { hashPassword, verifyPassword } from "../src/security/passwords";
+import { consumeResetCode, discardResetCode, issueResetCode, RESET_WINDOW_MS } from "../src/security/passwordResets";
 import {
     ADMIN_CREATION_CODE_WINDOW_MS,
     consumeAdminCreationCode,
     discardAdminCreationCode,
     issueAdminCreationCode,
-} from "../src/adminCreationCodes";
+} from "../src/security/adminCreationCodes";
 import {
     adminCreateSchema,
     adminCreationCodeRequestSchema,
@@ -24,7 +24,7 @@ import {
     userPasswordResetLegacySchema,
     userPasswordResetRequestSchema,
     userPasswordResetSchema,
-} from "../src/schemas";
+} from "../src/database/schemas";
 
 test("hashPassword salts every hash and verifyPassword checks it", async () => {
     const first = await hashPassword("correct horse");
@@ -37,12 +37,48 @@ test("hashPassword salts every hash and verifyPassword checks it", async () => {
     assert.equal(await verifyPassword("correct horse", "not-a-hash"), false);
 });
 
+test("verifyPassword rejects malformed stored hashes without throwing", async () => {
+    for (const stored of [
+        "",
+        "bcrypt$00$00",
+        "scrypt",
+        "scrypt$",
+        "scrypt$not-hex$not-hex",
+        "scrypt$00$00",
+        "scrypt$00000000000000000000000000000000$00",
+    ]) {
+        await assert.doesNotReject(async () => {
+            assert.equal(await verifyPassword("password", stored), false);
+        });
+    }
+});
+
+test("password hashes use the expected format and never embed the password", async () => {
+    const stored = await hashPassword("pāssword & secret");
+    const [scheme, salt, hash] = stored.split("$");
+
+    assert.equal(scheme, "scrypt");
+    assert.match(salt ?? "", /^[0-9a-f]{32}$/);
+    assert.match(hash ?? "", /^[0-9a-f]{128}$/);
+    assert.equal(stored.includes("pāssword"), false);
+});
+
 test("keysMatch accepts the right key only", () => {
     const stored = hashKey("business-key");
 
     assert.equal(keysMatch("business-key", stored), true);
     assert.equal(keysMatch("other-key", stored), false);
     assert.equal(keysMatch("business-key", "short"), false);
+});
+
+test("key hashing is deterministic and keysMatch handles empty, unicode, and malformed hashes", () => {
+    assert.equal(hashKey(""), hashKey(""));
+    assert.notEqual(hashKey(""), hashKey(" "));
+    assert.equal(keysMatch("🔐秘密", hashKey("🔐秘密")), true);
+    assert.equal(keysMatch("", hashKey("")), true);
+    assert.equal(keysMatch("key", ""), false);
+    assert.equal(keysMatch("key", "0".repeat(64)), false);
+    assert.equal(keysMatch("key", "g".repeat(64)), false);
 });
 
 test("a reset code is 6 digits, single use, and blocks a new request for 5 minutes", () => {
@@ -65,6 +101,17 @@ test("a reset code expires after the window and a new one can then be issued", (
     discardResetCode("u2");
 });
 
+test("reset-code expiry is exact and discard invalidates a code immediately", () => {
+    const start = 2_500_000;
+    const code = issueResetCode("u2-exact", start);
+
+    assert.equal(consumeResetCode("u2-exact", code, start + RESET_WINDOW_MS - 1), true);
+
+    const nextCode = issueResetCode("u2-discard", start);
+    discardResetCode("u2-discard");
+    assert.equal(consumeResetCode("u2-discard", nextCode, start), false);
+});
+
 test("a reset code dies after 5 wrong guesses", () => {
     const start = 3_000_000;
     const code = issueResetCode("u3", start);
@@ -73,6 +120,18 @@ test("a reset code dies after 5 wrong guesses", () => {
     for (let i = 0; i < 5; i++) assert.equal(consumeResetCode("u3", wrong, start + i), false);
 
     assert.equal(consumeResetCode("u3", code, start + 10), false);
+});
+
+test("reset codes are isolated by exact identifiers and wrong guesses do not consume the valid code early", () => {
+    const start = 3_500_000;
+    const code = issueResetCode("case-sensitive-user", start);
+    const wrong = code === "000000" ? "000001" : "000000";
+
+    assert.equal(consumeResetCode("CASE-SENSITIVE-USER", code, start), false);
+    for (let i = 0; i < 4; i++) {
+        assert.equal(consumeResetCode("case-sensitive-user", wrong, start + i), false);
+    }
+    assert.equal(consumeResetCode("case-sensitive-user", code, start + 4), true);
 });
 
 test("codes are tracked per user", () => {
@@ -113,6 +172,40 @@ test("admin creation codes are rate limited and expire after five incorrect atte
         assert.equal(consumeAdminCreationCode("admin_user_2", "admin2@example.com", wrong, start + i), false);
     }
     assert.equal(consumeAdminCreationCode("admin_user_2", "admin2@example.com", code, start + 10), false);
+});
+
+test("admin creation identifiers are case-insensitive and discard invalidates a code", () => {
+    const start = 7_000_000;
+    const code = issueAdminCreationCode("Admin_User_3", "Admin3@Example.com", start);
+
+    assert.equal(
+        consumeAdminCreationCode("admin_user_3", "ADMIN3@example.COM", code, start),
+        true
+    );
+
+    const nextCode = issueAdminCreationCode("Admin_User_4", "Admin4@Example.com", start);
+    discardAdminCreationCode("admin_user_4", "admin4@example.com");
+    assert.equal(
+        consumeAdminCreationCode("ADMIN_USER_4", "ADMIN4@EXAMPLE.COM", nextCode, start),
+        false
+    );
+});
+
+test("admin creation code expiry is exact and users remain isolated", () => {
+    const start = 8_000_000;
+    const code = issueAdminCreationCode("admin_user_5", "admin5@example.com", start);
+
+    assert.equal(
+        consumeAdminCreationCode("admin_user_5", "admin5@example.com", code, start + ADMIN_CREATION_CODE_WINDOW_MS - 1),
+        true
+    );
+
+    const otherCode = issueAdminCreationCode("admin_user_6", "admin6@example.com", start);
+    assert.equal(
+        consumeAdminCreationCode("admin_user_5", "admin6@example.com", otherCode, start),
+        false
+    );
+    discardAdminCreationCode("admin_user_6", "admin6@example.com");
 });
 
 test("userCreateSchema trims the username and lowercases the email", () => {

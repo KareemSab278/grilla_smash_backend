@@ -39,7 +39,7 @@ export const sendEmail = async ({ to, subject, title, message }: EmailParams): P
     if (error) throw new Error(`Failed to send email: ${error.message}`);
 };
 
-const buildEmailContent = ({ title, message }: Pick<EmailParams, "title" | "message">): string => `
+export const buildEmailContent = ({ title, message }: Pick<EmailParams, "title" | "message">): string => `
 <!DOCTYPE html>
 <html lang="en">
 <head>

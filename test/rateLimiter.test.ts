@@ -89,9 +89,9 @@ test("rejects the 31st request within one second and blocks globally", async () 
 
     const blocked = await invoke(middleware);
     assert.equal(blocked.statusCode, 429);
-    assert.equal(blocked.headers.get("retry-after"), "60");
-    assert.deepEqual(blocked.body, { detail: "Too many requests" });
-    assert.equal(state.blockedUntil, state.now + 60_000);
+    assert.equal(blocked.headers.get("retry-after"), "6");
+    assert.deepEqual(blocked.body, { detail: "Too many requests - Please wait 6 seconds" });
+    assert.equal(state.blockedUntil, state.now + 6_000);
 });
 
 test("rejects the 101st request within one minute when per-second is not hit", async () => {
@@ -106,8 +106,8 @@ test("rejects the 101st request within one minute when per-second is not hit", a
 
     const blocked = await invoke(middleware);
     assert.equal(blocked.statusCode, 429);
-    assert.equal(blocked.headers.get("retry-after"), "60");
-    assert.deepEqual(blocked.body, { detail: "Too many requests" });
+    assert.equal(blocked.headers.get("retry-after"), "6");
+    assert.deepEqual(blocked.body, { detail: "Too many requests - Please wait 6 seconds" });
 });
 
 test("all middleware instances in this process share the global block state", async () => {
@@ -120,7 +120,7 @@ test("all middleware instances in this process share the global block state", as
 
     const blockedOnOtherInstance = await invoke(instanceB);
     assert.equal(blockedOnOtherInstance.statusCode, 429);
-    assert.equal(blockedOnOtherInstance.headers.get("retry-after"), "60");
+    assert.equal(blockedOnOtherInstance.headers.get("retry-after"), "6");
 });
 
 test("Retry-After reports the remaining block duration", async () => {
@@ -130,5 +130,5 @@ test("Retry-After reports the remaining block duration", async () => {
     const result = await invoke(middleware);
     assert.equal(result.statusCode, 429);
     assert.equal(result.headers.get("retry-after"), "12");
-    assert.deepEqual(result.body, { detail: "Too many requests" });
+    assert.deepEqual(result.body, { detail: "Too many requests - Please wait 12 seconds" });
 });
