@@ -31,6 +31,9 @@ const branch = (coordinates: { latitude: number | null; longitude: number | null
         sunday: { open: "09:00", close: "17:00", is_closed: false },
     },
     unavailable_products: [],
+    delivery_disabled: false,
+    pickup_disabled: false,
+    delivery_range_km: 5,
 });
 
 const address = {

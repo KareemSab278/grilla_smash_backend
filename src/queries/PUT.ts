@@ -33,8 +33,11 @@ SET
     phone = COALESCE($6, phone),
     latitude = COALESCE($7, latitude),
     longitude = COALESCE($8, longitude),
-    active = COALESCE($9, active)
-WHERE id = $10
+    active = COALESCE($9, active),
+    delivery_disabled = COALESCE($10, delivery_disabled),
+    pickup_disabled = COALESCE($11, pickup_disabled),
+    delivery_range_km = COALESCE($12, delivery_range_km)
+WHERE id = $13
 RETURNING *;
 `;
 

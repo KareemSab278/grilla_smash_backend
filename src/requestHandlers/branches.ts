@@ -106,6 +106,9 @@ const updateBranch = async (req: Request<BranchParams>, res: Response<BranchRow>
         orNull(data.latitude),
         orNull(data.longitude),
         orNull(data.active),
+        orNull(data.delivery_disabled),
+        orNull(data.pickup_disabled),
+        orNull(data.delivery_range_km),
         req.params.branchId,
     ]);
 

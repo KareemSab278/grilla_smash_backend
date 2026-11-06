@@ -158,6 +158,9 @@ export const branchUpdateSchema = z.object({
     latitude: z.number().min(-90).max(90).nullish(),
     longitude: z.number().min(-180).max(180).nullish(),
     active: z.boolean().nullish(),
+    delivery_disabled: z.boolean().nullish(),
+    pickup_disabled: z.boolean().nullish(),
+    delivery_range_km: z.number().int().nullish(),
 });
 
 export const kdsNotificationRegistrationSchema = z.object({

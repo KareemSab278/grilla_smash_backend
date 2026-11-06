@@ -9,6 +9,7 @@ import test from "node:test";
 
 import {
     businessCreateSchema,
+    branchUpdateSchema,
     branchUnavailableProductsSchema,
     deliveryQuoteSchema,
     openingHoursPatchSchema,
@@ -123,6 +124,22 @@ test("branchUnavailableProductsSchema accepts empty and populated product lists"
     );
     assert.throws(() => branchUnavailableProductsSchema.parse({ unavailable_products: [""] }));
     assert.throws(() => branchUnavailableProductsSchema.parse({}));
+});
+
+test("branchUpdateSchema accepts delivery and pickup settings", () => {
+    assert.deepEqual(
+        branchUpdateSchema.parse({
+            delivery_disabled: true,
+            pickup_disabled: false,
+            delivery_range_km: 12,
+        }),
+        {
+            delivery_disabled: true,
+            pickup_disabled: false,
+            delivery_range_km: 12,
+        }
+    );
+    assert.throws(() => branchUpdateSchema.parse({ delivery_range_km: 1.5 }));
 });
 
 test("offerCreateSchema rejects invalid dates and accepts valid ones", () => {

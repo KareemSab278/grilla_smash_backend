@@ -374,7 +374,7 @@ curl -X POST localhost:8000/business -H 'Content-Type: application/json' \
 | DELETE | `/branches/:branchId/unavailable-products/:productId` | Restore product availability at one branch |
 | DELETE | `/branches/:branchId` | Delete. 409 if the branch has orders |
 
-Body fields: `name`\*, `address_line1`\*, `city`\*, `postcode`\*, `address_line2`, `phone`, `latitude` (-90 to 90), `longitude` (-180 to 180). Create also accepts `opening_hours`; omit it to use the default 09:00-17:00 schedule for every day. Update also takes `active`.
+Body fields: `name`\*, `address_line1`\*, `city`\*, `postcode`\*, `address_line2`, `phone`, `latitude` (-90 to 90), `longitude` (-180 to 180). Create also accepts `opening_hours`; omit it to use the default 09:00-17:00 schedule for every day. Update also takes `active`, `delivery_disabled`, `pickup_disabled` (booleans), and `delivery_range_km` (integer, default 5).
 
 `opening_hours` is stored as JSON and returned on every branch response:
 

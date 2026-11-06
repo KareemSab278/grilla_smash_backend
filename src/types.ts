@@ -73,6 +73,9 @@ export type BranchRow = {
     updated_at: Date;
     opening_hours: OpeningHours;
     unavailable_products: string[];
+    delivery_disabled: boolean;
+    pickup_disabled: boolean;
+    delivery_range_km: number;
 };
 
 export type CategoryRow = {
