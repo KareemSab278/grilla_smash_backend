@@ -72,6 +72,34 @@ test("calculateDeliveryPricing geocodes the destination and uses branch coordina
     }
 });
 
+test("calculateDeliveryPricing enforces the branch delivery range and accepts its boundary", async () => {
+    const { calculateDeliveryPricing } = await import("../src/payment/deliveryPricing");
+    const originalFetch = globalThis.fetch;
+    let distanceMeters = 9200;
+    globalThis.fetch = async (input) => String(input).includes("geocode")
+        ? response({ status: "OK", results: [{ geometry: { location: { lat: 51.5, lng: -0.1 } } }] })
+        : response({ routes: [{ distanceMeters }] });
+
+    try {
+        await assert.rejects(
+            calculateDeliveryPricing(
+                { ...branch({ latitude: 51.52, longitude: -0.12 }), delivery_range_km: 1 },
+                address
+            ),
+            { status: 400, message: "Delivery address is outside this branch's delivery area" }
+        );
+
+        distanceMeters = 1000;
+        const result = await calculateDeliveryPricing(
+            { ...branch({ latitude: 51.52, longitude: -0.12 }), delivery_range_km: 1 },
+            address
+        );
+        assert.equal(result.distanceKm, 1);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 test("calculateDeliveryPricing geocodes the branch when stored coordinates are invalid", async () => {
     const { calculateDeliveryPricing } = await import("../src/payment/deliveryPricing");
     const originalFetch = globalThis.fetch;

@@ -168,7 +168,10 @@ export const calculateDeliveryPricing = async (
         (await getLatLng(addressText([branch.address_line1, branch.address_line2, branch.city, branch.postcode]), apiKey));
 
     const distanceKm = await getDrivingDistanceKm(origin, destination, apiKey);
-    if (distanceKm > CONFIG.maxDeliveryDistanceKm) {
+    if (!Number.isFinite(branch.delivery_range_km) || branch.delivery_range_km < 0) {
+        throw new HttpError(500, "Branch delivery range is invalid");
+    }
+    if (distanceKm > Math.min(CONFIG.maxDeliveryDistanceKm, branch.delivery_range_km)) {
         throw badRequest("Delivery address is outside this branch's delivery area");
     }
 
