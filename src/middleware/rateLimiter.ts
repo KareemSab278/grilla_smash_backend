@@ -11,9 +11,9 @@ import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 
 const dev = CONFIG.isDevelopment;
 
-const MAX_REQUESTS_PER_SECOND = 30 * (dev ? 10 : 1);
-const MAX_REQUESTS_PER_MINUTE = 100 * (dev ? 10 : 1);
-const BLOCK_DURATION_MS = dev ? 6_000 : 60_000;
+const MAX_REQUESTS_PER_SECOND = 30 * (dev ? 100 : 1);
+const MAX_REQUESTS_PER_MINUTE = 100 * (dev ? 100 : 1);
+const BLOCK_DURATION_MS = dev ? 500 : 60_000;
 const SHARED_KEY = "all-requests";
 
 type RateLimiterLike = Pick<RateLimiterMemory, "consume">;
