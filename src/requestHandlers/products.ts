@@ -103,6 +103,7 @@ const createProduct = async (req: Request, res: Response<ProductResponse>): Prom
             data.price,
             orNull(data.image_url),
             data.sort_order,
+            data.ingredients,
         ]);
 
         await linkCategories(tx, productId, categoryIds);
@@ -127,6 +128,7 @@ const updateProduct = async (req: Request<ProductParams>, res: Response<ProductR
             orNull(data.image_url),
             orNull(data.sort_order),
             orNull(data.active),
+            orNull(data.ingredients),
             productId,
         ]);
 

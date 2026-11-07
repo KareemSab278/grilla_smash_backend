@@ -408,7 +408,7 @@ Body fields: `name`\*, `description`, `image_url`, `sort_order` (default 0). Upd
 
 ### 8.6 Products
 
-Products always come back with their `categories` array.
+Products always come back with their `categories` array and `ingredients` array. `ingredients` lists the product ingredients customers may ask to remove.
 
 | Method | Path | Description |
 |---|---|---|
@@ -418,14 +418,16 @@ Products always come back with their `categories` array.
 | PUT | `/products/:productId` | Partial update |
 | DELETE | `/products/:productId` | Delete (old orders keep their snapshot) |
 
-Body fields: `name`\*, `price`\* (pence), `description`, `image_url`, `sort_order` (default 0), `category_ids` (default `[]`, every id must exist, else 400). Update also takes `active`.
+Body fields: `name`\*, `price`\* (pence), `description`, `image_url`, `sort_order` (default 0), `ingredients` (default `[]`, names customers may remove), `category_ids` (default `[]`, every id must exist, else 400). Update also takes `active`.
 
 `category_ids` on update **replaces** the whole list. Omit it to leave categories alone.
+`ingredients` on update also replaces the whole list; omit it to leave ingredients unchanged or
+send `[]` to clear the list.
 
 ```json
 {
   "id": "5dbf0d8e43d9", "name": "Classic Smash Burger", "price": 899,
-  "description": null, "image_url": null, "sort_order": 0, "active": true,
+  "description": null, "image_url": null, "sort_order": 0, "ingredients": ["Lettuce", "Tomato"], "active": true,
   "created_at": "2026-10-08T11:45:44.174Z", "updated_at": "2026-10-08T11:45:44.174Z",
   "categories": [ { "id": "7ebb0ca3980c", "name": "Burgers", "...": "..." } ]
 }
@@ -556,6 +558,7 @@ Body fields:
 | `items[].product_id` | yes | |
 | `items[].quantity` | yes | 1 to 99 |
 | `items[].modifier_ids` | no | Modifier ids, each at most once |
+| `items[].removed_ingredients` | no | Ingredient names from that product's `ingredients` list |
 | `items[].notes` | no | Up to 1000 characters |
 | `offers` | one of `items` / `offers` | Up to 50 bundles, see [Ordering an offer](#ordering-an-offer) |
 | `payment` | no | `{ "provider": "stripe", "payment_reference": "pi_123" }` (or the legacy `provider_payment_id`), recorded in `payments` as `PENDING` |
@@ -568,7 +571,7 @@ curl -X POST localhost:8000/orders -H 'Content-Type: application/json' -d '{
   "customer_email": "jordan@example.com",
   "address_line1": "1 Test Street", "city": "London", "postcode": "SW1A 1AA",
   "items": [
-    { "product_id": "5dbf0d8e43d9", "quantity": 2, "modifier_ids": ["17896a2d3891"], "notes": "extra crispy" }
+    { "product_id": "5dbf0d8e43d9", "quantity": 2, "modifier_ids": ["17896a2d3891"], "removed_ingredients": ["Lettuce"], "notes": "extra crispy" }
   ],
   "payment": { "provider": "stripe", "payment_reference": "pi_123" }
 }'
@@ -588,7 +591,8 @@ For each item, in this order:
 2. Unit price = the branch's `price_override` if set, otherwise the product `price`, **plus** the price of each selected modifier.
 3. Every selected modifier must be active and belong to a group attached to *that* product (400 otherwise). Selecting the same modifier twice is rejected.
 4. For each attached group: the number selected must be at least `min_selections` (at least 1 if `required` and the group has available choices) and at most `max_selections` (400 otherwise).
-5. Line total = unit price x quantity.
+5. Every removed ingredient must exactly match an entry in that product's `ingredients` list (400 otherwise).
+6. Line total = unit price x quantity.
 
 Then `subtotal` = sum of line totals, `total` = `subtotal` + `delivery_fee` (delivery only), `discount` is 0.
 
@@ -624,6 +628,7 @@ curl -X PATCH localhost:8000/orders/status -H 'Content-Type: application/json' \
     "items": [{
       "id": "...", "order_id": "c7cea41be001", "product_id": "5dbf0d8e43d9",
       "name": "Classic Smash Burger", "quantity": 2, "unit_price": 949, "total": 1898, "notes": "extra crispy",
+      "removed_ingredients": ["Lettuce"],
       "modifiers": [ { "id": "...", "modifier_id": "17896a2d3891", "name": "Mayo", "price": 50, "quantity": 1 } ]
     }]
   }]
@@ -901,14 +906,14 @@ A bundle is one offer plus the product (and modifiers) chosen for each rule. Eve
   "offers": [
     { "offer_id": "<offerId>", "quantity": 2,
       "rules": [
-        { "offer_rule_id": "<mainRuleId>", "items": [ { "product_id": "<productId>" } ] },
+        { "offer_rule_id": "<mainRuleId>", "items": [ { "product_id": "<productId>", "removed_ingredients": ["Lettuce"] } ] },
         { "offer_rule_id": "<drinkRuleId>", "items": [ { "product_id": "<productId>", "modifier_ids": ["<modifierId>"] } ] }
       ] }
   ]
 }
 ```
 
-The server checks that the offer is `active` and inside `starts_at` / `ends_at`, that each product belongs to its rule and is sold at the branch, and that the modifiers come from the rule's groups and respect each group's `required` / `min_selections` / `max_selections`. Otherwise 400.
+The server checks that the offer is `active` and inside `starts_at` / `ends_at`, that each product belongs to its rule and is sold at the branch, and that the modifiers come from the rule's groups and respect each group's `required` / `min_selections` / `max_selections`. Removed ingredients must exactly match the product's `ingredients` list. Otherwise 400.
 
 Pricing (see `src/offerPricing.ts`), per bundle: list value = products (branch price) + modifiers.
 

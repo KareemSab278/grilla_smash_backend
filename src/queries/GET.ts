@@ -232,6 +232,7 @@ SELECT
     p.name,
     p.active,
     p.price,
+    p.ingredients,
     bpo.active AS branch_active,
     bpo.price_override,
     COALESCE(b.unavailable_products, '{}'::text[]) @> ARRAY[p.id] AS branch_unavailable

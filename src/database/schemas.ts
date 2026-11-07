@@ -203,6 +203,7 @@ export const productCreateSchema = z.object({
     price: pence,
     image_url: optionalText,
     sort_order: sortOrder.default(0),
+    ingredients: z.array(name).default([]),
     category_ids: z.array(id).default([]),
 });
 
@@ -212,6 +213,7 @@ export const productUpdateSchema = z.object({
     price: pence.nullish(),
     image_url: optionalText,
     sort_order: sortOrder.nullish(),
+    ingredients: z.array(name).nullish(),
     active: z.boolean().nullish(),
     category_ids: z.array(id).nullish(),
 });
@@ -347,12 +349,14 @@ const orderItemSchema = z.object({
     quantity: z.int().min(1).max(99),
     notes: z.string().trim().max(1000).nullish(),
     modifier_ids: z.array(id).default([]),
+    removed_ingredients: z.array(name).default([]),
 });
 
 // one bundle: the offer plus the products (and modifiers) picked for each of its rules
 const orderOfferItemSchema = z.object({
     product_id: id,
     modifier_ids: z.array(id).default([]),
+    removed_ingredients: z.array(name).default([]),
 });
 
 const orderOfferRuleSchema = z.object({

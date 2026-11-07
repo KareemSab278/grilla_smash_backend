@@ -93,8 +93,9 @@ SET
     price = COALESCE($3, price),
     image_url = COALESCE($4, image_url),
     sort_order = COALESCE($5, sort_order),
-    active = COALESCE($6, active)
-WHERE id = $7
+    active = COALESCE($6, active),
+    ingredients = COALESCE($7::text[], ingredients)
+WHERE id = $8
 RETURNING id;
 `;
 

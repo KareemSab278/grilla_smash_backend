@@ -153,6 +153,36 @@ Password reset routes also do not require the business key:
 
 Reset codes have the same five-minute lifetime and five-attempt limit as admin-creation codes.
 
+## Editing product ingredients
+
+The admin product editor can load a product with `GET /products/:productId` (or use the
+`ingredients` array returned by `GET /products`) and edit that list. These are the ingredients
+customers may request to remove from the product.
+
+To replace the list, send the complete array to the existing product update route:
+
+```http
+PUT /products/:productId
+Content-Type: application/json
+```
+
+```json
+{
+  "ingredients": ["Lettuce", "Tomato", "Pickles"]
+}
+```
+
+The response contains the updated product, including `ingredients`. The array replaces the old
+list: send `[]` to clear it, or omit `ingredients` to leave it unchanged. Product creation also
+accepts `ingredients`; it defaults to `[]`.
+
+When placing an order, the storefront sends the exact selected names in that item's
+`removed_ingredients` array. The backend rejects names not present in the product's ingredient
+list and includes accepted removals in the order item returned by the order GET routes.
+
+Product routes follow the existing API authorization behavior: they are not currently restricted
+to `ADMIN` users. The role model is not generally enforced for product management.
+
 ## Updating unavailable products for a branch
 
 Use this endpoint when saving the full set of products that should be unavailable at a branch:

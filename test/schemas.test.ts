@@ -17,6 +17,8 @@ import {
     offerCreateSchema,
     orderCreateSchema,
     orderStatusUpdateSchema,
+    productCreateSchema,
+    productUpdateSchema,
     productListQuerySchema,
 } from "../src/database/schemas";
 import { DEFAULT_OPENING_HOURS, mergeOpeningHours } from "../src/branches/branchHours";
@@ -116,6 +118,13 @@ test("productListQuerySchema accepts boolean-like query values", () => {
     assert.equal(productListQuerySchema.parse({ active_only: "0" }).active_only, false);
 });
 
+test("product schemas accept and normalize removable ingredients", () => {
+    const product = productCreateSchema.parse({ name: "Burger", price: 899, ingredients: [" Lettuce ", "Tomato"] });
+    assert.deepEqual(product.ingredients, ["Lettuce", "Tomato"]);
+    assert.deepEqual(productCreateSchema.parse({ name: "Side", price: 300 }).ingredients, []);
+    assert.deepEqual(productUpdateSchema.parse({ ingredients: [" Onion "] }).ingredients, ["Onion"]);
+});
+
 test("branchUnavailableProductsSchema accepts empty and populated product lists", () => {
     assert.deepEqual(branchUnavailableProductsSchema.parse({ unavailable_products: [] }), { unavailable_products: [] });
     assert.deepEqual(
@@ -168,9 +177,22 @@ test("orderCreateSchema applies defaults and strips client supplied prices", () 
 
     assert.equal(parsed.order_type, "PICKUP");
     assert.equal(parsed.delivery_fee, 0);
-    assert.deepEqual(parsed.items, [{ product_id: "p1", quantity: 2, modifier_ids: [] }]);
+    assert.deepEqual(parsed.items, [{ product_id: "p1", quantity: 2, modifier_ids: [], removed_ingredients: [] }]);
     assert.deepEqual(parsed.payment, { provider: "stripe", payment_reference: "pi_test_123" });
     assert.equal("total" in parsed, false);
+});
+
+test("orderCreateSchema accepts trimmed removals for regular and offer items", () => {
+    const parsed = orderCreateSchema.parse({
+        ...validOrder,
+        items: [{ product_id: "p1", quantity: 1, removed_ingredients: [" Lettuce "] }],
+        offers: [{
+            offer_id: "o1",
+            rules: [{ offer_rule_id: "r1", items: [{ product_id: "p1", removed_ingredients: [" Onion "] }] }],
+        }],
+    });
+    assert.deepEqual(parsed.items[0]?.removed_ingredients, ["Lettuce"]);
+    assert.deepEqual(parsed.offers[0]?.rules[0]?.items[0]?.removed_ingredients, ["Onion"]);
 });
 
 test("orderCreateSchema prefers payment_reference when both payment keys are sent", () => {

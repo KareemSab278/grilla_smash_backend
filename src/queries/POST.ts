@@ -56,8 +56,8 @@ RETURNING *;
 
 // PRODUCTS
 const createProductQuery: string = `
-INSERT INTO products (id, name, description, price, image_url, sort_order)
-VALUES ($1, $2, $3, $4, $5, $6);
+INSERT INTO products (id, name, description, price, image_url, sort_order, ingredients)
+VALUES ($1, $2, $3, $4, $5, $6, $7::text[]);
 `;
 
 const linkProductCategoryQuery: string = `
@@ -153,8 +153,8 @@ DO UPDATE SET
 `;
 
 const createOrderItemQuery: string = `
-INSERT INTO order_items (id, order_id, product_id, offer_id, offer_rule_id, name, quantity, unit_price, total, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+INSERT INTO order_items (id, order_id, product_id, offer_id, offer_rule_id, name, quantity, unit_price, total, notes, removed_ingredients)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[]);
 `;
 
 const createOrderOfferQuery: string = `

@@ -97,6 +97,7 @@ export type ProductRow = {
     price: number;
     image_url: string | null;
     sort_order: number;
+    ingredients: string[];
     active: boolean;
     created_at: Date;
     updated_at: Date;
@@ -255,6 +256,7 @@ export type OrderItemRow = {
     unit_price: number;
     total: number;
     notes: string | null;
+    removed_ingredients: string[];
 };
 
 export type OrderItemModifierRow = {
@@ -288,6 +290,7 @@ export type OrderPricingProductRow = {
     name: string;
     active: boolean;
     price: number;
+    ingredients: string[];
     branch_active: boolean | null;
     price_override: number | null;
     branch_unavailable: boolean;

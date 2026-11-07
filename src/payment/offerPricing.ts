@@ -26,6 +26,7 @@
 import { badRequest } from "../helpers/errors";
 import type { OrderOfferCreate } from "../database/schemas";
 import type { OfferResponse, OfferRuleResponse, OrderPricingProductRow } from "../types";
+import { resolveRemovedIngredients } from "./ingredientRemoval";
 
 export type PricedOfferModifier = { id: string; name: string; price: number };
 
@@ -36,6 +37,7 @@ export type PricedOfferItem = {
     quantity: number;
     unitPrice: number;
     total: number;
+    removedIngredients: string[];
     modifiers: PricedOfferModifier[];
 };
 
@@ -190,6 +192,11 @@ export const priceBundle = (
             }
 
             const modifiers = resolveRuleModifiers(offer.name, rule, product.name, pick.modifier_ids);
+            const removedIngredients = resolveRemovedIngredients(
+                product.name,
+                pick.removed_ingredients,
+                product.ingredients
+            );
             const productPrice = product.price_override ?? product.price;
             const modifierPrice = modifiers.reduce((sum, modifier) => sum + modifier.price, 0);
             const unitPrice = productPrice + modifierPrice;
@@ -204,6 +211,7 @@ export const priceBundle = (
                 quantity: bundle.quantity,
                 unitPrice,
                 total: unitPrice * bundle.quantity,
+                removedIngredients,
                 modifiers,
             });
         }

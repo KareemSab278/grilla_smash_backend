@@ -17,6 +17,7 @@ const product = (id: string, price: number, extra: Partial<OrderPricingProductRo
     name: `Product ${id}`,
     active: true,
     price,
+    ingredients: [],
     branch_active: null,
     price_override: null,
     branch_unavailable: false,
@@ -32,6 +33,7 @@ const productRow = (id: string, price: number) => ({
     price,
     image_url: null,
     sort_order: 0,
+    ingredients: [],
     active: true,
     created_at: date,
     updated_at: date,
@@ -129,6 +131,28 @@ test("modifiers are charged on top of a FIXED_PRICE offer and multiplied by quan
 
     assert.equal(priced.discount, 200);
     assert.equal(priced.items.reduce((sum, item) => sum + item.total, 0), 2 * (800 + 350));
+});
+
+test("offer items may remove listed ingredients but reject unlisted ones", () => {
+    const burger = product("burger", 800, { ingredients: ["Lettuce", "Tomato"] });
+    const offerProducts = new Map([burger, product("fries", 300)].map(row => [row.id, row]));
+    const picks = bundle({
+        rules: [
+            { offer_rule_id: "main", items: [{ product_id: "burger", removed_ingredients: ["Lettuce"] }] },
+            { offer_rule_id: "side", items: [{ product_id: "fries", modifier_ids: ["small"] }] },
+        ],
+    });
+
+    const priced = priceBundle(makeOffer(), picks, offerProducts, now);
+    assert.deepEqual(priced.items[0]?.removedIngredients, ["Lettuce"]);
+
+    const invalidPicks = bundle({
+        rules: [
+            { offer_rule_id: "main", items: [{ product_id: "burger", removed_ingredients: ["Pickles"] }] },
+            { offer_rule_id: "side", items: [{ product_id: "fries", modifier_ids: ["small"] }] },
+        ],
+    });
+    assert.throws(() => priceBundle(makeOffer(), invalidPicks, offerProducts, now), /cannot be removed/);
 });
 
 test("PERCENTAGE and FIXED_DISCOUNT are taken off the list value", () => {

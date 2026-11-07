@@ -41,6 +41,7 @@ import { getRequiredRow, groupBy, newId, orNull, requireRow, unique } from "../h
 import { notifyOrderStatus } from "../notifications/orderEmails";
 import { notifyKdsOfNewOrder } from "../notifications/kdsNotification";
 import { calculateDeliveryPricing } from "../payment/deliveryPricing";
+import { resolveRemovedIngredients } from "../payment/ingredientRemoval";
 import { parseInput } from "../middleware/validate";
 import { loadAutomaticOffers, loadOffer } from "./offers";
 import { freeItems, priceBundle } from "../payment/offerPricing";
@@ -155,6 +156,7 @@ type PricedItem = {
     unitPrice: number;
     total: number;
     notes: string | null;
+    removedIngredients: string[];
     modifiers: PricedModifier[];
 };
 
@@ -218,6 +220,11 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
             groupsByProduct.get(item.product_id) ?? [],
             modifiersByProduct.get(item.product_id) ?? []
         );
+        const removedIngredients = resolveRemovedIngredients(
+            product.name,
+            item.removed_ingredients,
+            product.ingredients
+        );
 
         const unitPrice =
             (product.price_override ?? product.price) +
@@ -232,6 +239,7 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
             unitPrice,
             total: unitPrice * item.quantity,
             notes: item.notes ?? null,
+            removedIngredients,
             modifiers: itemModifiers,
         };
     });
@@ -270,6 +278,7 @@ const priceOffers = async (db: Db, data: OrderCreate): Promise<PricedOrderOffers
                 unitPrice: item.unitPrice,
                 total: item.total,
                 notes: null,
+                removedIngredients: item.removedIngredients,
                 modifiers: item.modifiers,
             })
         )
@@ -294,6 +303,7 @@ const priceFreeItems = async (db: Db, items: readonly PricedItem[]): Promise<Pri
             unitPrice: 0,
             total: 0,
             notes: null,
+            removedIngredients: [],
             modifiers: [],
         })
     );
@@ -314,6 +324,7 @@ const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]
             item.unitPrice,
             item.total,
             orNull(item.notes),
+            item.removedIngredients,
         ]);
 
         for (const modifier of item.modifiers) {
