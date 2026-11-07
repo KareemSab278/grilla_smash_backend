@@ -13,7 +13,7 @@ import sql, { dbAll, dbGet, dbRun, transaction } from "../database/db";
 import { getRequiredRow, orNull, requireRow } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
 import { requireBranchManager } from "../middleware/requireBranchManager";
-import { branchProductOverrideSchema } from "../database/schemas";
+import { branchProductOverrideSchema, productListQuerySchema } from "../database/schemas";
 import type { BranchProductOverrideRow, BranchProductResponse, BranchRow, ProductRow, SuccessResponse } from "../types";
 
 const router = express.Router();
@@ -40,10 +40,11 @@ type BranchProductJoinRow = ProductRow & {
 // active products for the branch with the branch's own price applied. NULL override = use the normal value
 const getBranchProducts = async (req: Request<BranchParams>, res: Response<BranchProductResponse[]>): Promise<void> => {
     const { branchId } = req.params;
+    const { include_hidden: includeHidden } = parseInput(productListQuerySchema, req.query);
 
     await getRequiredRow<BranchRow>(sql, QUERIES.GET.BRANCH_BY_ID, branchId, "branch");
 
-    const rows = await dbAll<BranchProductJoinRow>(sql, QUERIES.GET.BRANCH_PRODUCTS, [branchId]);
+    const rows = await dbAll<BranchProductJoinRow>(sql, QUERIES.GET.BRANCH_PRODUCTS, [branchId, includeHidden]);
 
     res.json(rows.map(row => ({ ...row, effective_price: row.price_override ?? row.price })));
 };

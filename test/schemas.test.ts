@@ -116,6 +116,7 @@ test("productListQuerySchema accepts boolean-like query values", () => {
     assert.equal(productListQuerySchema.parse({}).active_only, false);
     assert.equal(productListQuerySchema.parse({ active_only: "true" }).active_only, true);
     assert.equal(productListQuerySchema.parse({ active_only: "0" }).active_only, false);
+    assert.equal(productListQuerySchema.parse({ include_hidden: "true" }).include_hidden, true);
 });
 
 test("product schemas accept and normalize removable ingredients", () => {
@@ -123,6 +124,12 @@ test("product schemas accept and normalize removable ingredients", () => {
     assert.deepEqual(product.ingredients, ["Lettuce", "Tomato"]);
     assert.deepEqual(productCreateSchema.parse({ name: "Side", price: 300 }).ingredients, []);
     assert.deepEqual(productUpdateSchema.parse({ ingredients: [" Onion "] }).ingredients, ["Onion"]);
+});
+
+test("product schemas default hidden to false and accept updates", () => {
+    assert.equal(productCreateSchema.parse({ name: "Burger", price: 899 }).hidden, false);
+    assert.equal(productCreateSchema.parse({ name: "Burger", price: 899, hidden: true }).hidden, true);
+    assert.equal(productUpdateSchema.parse({ hidden: true }).hidden, true);
 });
 
 test("branchUnavailableProductsSchema accepts empty and populated product lists", () => {

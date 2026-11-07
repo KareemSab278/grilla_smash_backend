@@ -59,6 +59,7 @@ LEFT JOIN branch_product_overrides bpo
     ON bpo.product_id = p.id
     AND bpo.branch_id = $1
 WHERE p.active
+  AND (NOT p.hidden OR $2)
   AND NOT (p.id = ANY(b.unavailable_products))
 ORDER BY p.sort_order, p.name;
 `;
@@ -170,7 +171,13 @@ ORDER BY sort_order, name;
 
 const getProductsQuery: string = `SELECT * FROM products ORDER BY sort_order, name;`;
 
-const getActiveProductsQuery: string = `SELECT * FROM products WHERE active ORDER BY sort_order, name;`;
+const getActiveProductsQuery: string = `
+SELECT *
+FROM products
+WHERE active
+  AND (NOT hidden OR $1)
+ORDER BY sort_order, name;
+`;
 
 const getProductByIdQuery: string = `SELECT * FROM products WHERE id = $1;`;
 const getProductIdsQuery: string = `SELECT id FROM products WHERE id = ANY($1::text[]);`;
@@ -233,6 +240,7 @@ SELECT
     p.active,
     p.price,
     p.ingredients,
+    p.hidden,
     bpo.active AS branch_active,
     bpo.price_override,
     COALESCE(b.unavailable_products, '{}'::text[]) @> ARRAY[p.id] AS branch_unavailable

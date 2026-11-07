@@ -1,8 +1,8 @@
 /*
     PRODUCT ROUTES - PRODUCTS ALWAYS COME BACK WITH THEIR CATEGORIES.
 
-    GET    /products                 optional ?active_only=true
-    GET    /products/:productId
+    GET    /products                 optional ?active_only=true&include_hidden=true
+    GET    /products/:productId      optional ?include_hidden=true
     POST   /products                 category_ids links the product to existing categories
     PUT    /products/:productId      partial update, category_ids (when sent) REPLACES the whole list
     DELETE /products/:productId
@@ -14,7 +14,7 @@ import type { Request, Response } from "express";
 import { QUERIES } from "../queries/queries";
 import sql, { dbAll, dbGet, dbRun, transaction } from "../database/db";
 import type { Db } from "../database/db";
-import { badRequest } from "../helpers/errors";
+import { badRequest, notFound } from "../helpers/errors";
 import { deleteById, getRequiredRow, groupBy, newId, orNull, requireRow, unique } from "../helpers/helpers";
 import { parseInput } from "../middleware/validate";
 import { productCreateSchema, productListQuerySchema, productUpdateSchema } from "../database/schemas";
@@ -62,11 +62,15 @@ const linkCategories = async (db: Db, productId: string, categoryIds: readonly s
 // ========================================
 
 const listProducts = async (req: Request, res: Response<ProductResponse[]>): Promise<void> => {
-    const { active_only: activeOnly } = parseInput(productListQuerySchema, req.query);
+    const { active_only: activeOnly, include_hidden: includeHidden } = parseInput(productListQuerySchema, req.query);
 
     // one query for every product's categories instead of one per product
     const [products, categoryLinks] = await Promise.all([
-        dbAll<ProductRow>(sql, activeOnly ? QUERIES.GET.ACTIVE_PRODUCTS : QUERIES.GET.PRODUCTS),
+        dbAll<ProductRow>(
+            sql,
+            activeOnly ? QUERIES.GET.ACTIVE_PRODUCTS : QUERIES.GET.PRODUCTS,
+            activeOnly ? [includeHidden] : []
+        ),
         dbAll<ProductCategoryJoinRow>(sql, QUERIES.GET.PRODUCT_CATEGORIES, [null]),
     ]);
 
@@ -83,7 +87,12 @@ const listProducts = async (req: Request, res: Response<ProductResponse[]>): Pro
 // ========================================
 
 const getProduct = async (req: Request<ProductParams>, res: Response<ProductResponse>): Promise<void> => {
-    res.json(await loadProduct(sql, req.params.productId));
+    const { include_hidden: includeHidden } = parseInput(productListQuerySchema, req.query);
+    const product = await getRequiredRow<ProductRow>(sql, QUERIES.GET.PRODUCT_BY_ID, req.params.productId, "product");
+    if (product.hidden && !includeHidden) throw notFound(`product ${req.params.productId} not found`);
+    const categories = await dbAll<ProductCategoryJoinRow>(sql, QUERIES.GET.PRODUCT_CATEGORIES, [req.params.productId]);
+
+    res.json({ ...product, categories: categories.map(stripJoinColumn) });
 };
 
 // ========================================
@@ -104,6 +113,7 @@ const createProduct = async (req: Request, res: Response<ProductResponse>): Prom
             orNull(data.image_url),
             data.sort_order,
             data.ingredients,
+            data.hidden,
         ]);
 
         await linkCategories(tx, productId, categoryIds);
@@ -129,6 +139,7 @@ const updateProduct = async (req: Request<ProductParams>, res: Response<ProductR
             orNull(data.sort_order),
             orNull(data.active),
             orNull(data.ingredients),
+            orNull(data.hidden),
             productId,
         ]);
 

@@ -156,7 +156,8 @@ Reset codes have the same five-minute lifetime and five-attempt limit as admin-c
 ## Editing product ingredients
 
 The admin product editor can load a product with `GET /products/:productId` (or use the
-`ingredients` array returned by `GET /products`) and edit that list. These are the ingredients
+`ingredients` array returned by `GET /products`) and edit that list. A hidden product can be loaded
+directly with `GET /products/:productId?include_hidden=true`. These are the ingredients
 customers may request to remove from the product.
 
 To replace the list, send the complete array to the existing product update route:
@@ -182,6 +183,40 @@ list and includes accepted removals in the order item returned by the order GET 
 
 Product routes follow the existing API authorization behavior: they are not currently restricted
 to `ADMIN` users. The role model is not generally enforced for product management.
+
+## Hiding products from the storefront
+
+For an existing database, add the column before deploying the backend:
+
+```sql
+ALTER TABLE products ADD COLUMN hidden boolean NOT NULL DEFAULT false;
+```
+
+`hidden` is separate from `active`. Set it with the existing product update route:
+
+```http
+PUT /products/:productId
+Content-Type: application/json
+```
+
+```json
+{
+  "hidden": true
+}
+```
+
+Send `false` to show it in the regular storefront catalog again. The field is returned in product
+responses and defaults to `false` on product creation. `GET /products?active_only=true` and
+`GET /branches/:branchId/products` omit hidden products by default; admin views that need them can
+use `include_hidden=true`. In particular, use
+`GET /products?active_only=true&include_hidden=true` when filling an offer product picker. Products
+attached to offers continue to appear in offer responses, and customers can order them through an
+offer while the product remains active and branch-available. The backend rejects a hidden product
+when submitted as a regular order item.
+
+The customer storefront should keep filtering hidden products from the regular catalog, but should
+not apply that filter to products nested under an offer from `GET /offers`; a hidden product in an
+offer is still orderable through that offer.
 
 ## Updating unavailable products for a branch
 

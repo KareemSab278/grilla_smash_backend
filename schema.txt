@@ -53,6 +53,7 @@ CREATE TABLE public.products (
   image_url text,
   sort_order integer NOT NULL DEFAULT 0,
   ingredients ARRAY NOT NULL DEFAULT '{}'::text[],
+  hidden boolean NOT NULL DEFAULT false,
   active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),

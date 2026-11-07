@@ -18,6 +18,7 @@ const product = (id: string, price: number, extra: Partial<OrderPricingProductRo
     active: true,
     price,
     ingredients: [],
+    hidden: false,
     branch_active: null,
     price_override: null,
     branch_unavailable: false,
@@ -34,6 +35,7 @@ const productRow = (id: string, price: number) => ({
     image_url: null,
     sort_order: 0,
     ingredients: [],
+    hidden: false,
     active: true,
     created_at: date,
     updated_at: date,
@@ -188,6 +190,13 @@ test("branch unavailable IDs control availability while global inactivity still 
         product("burger", 800, { active: false }),
     );
     assert.throws(() => priceBundle(makeOffer(), bundle(), globallyInactive, now), /not available at this branch/);
+});
+
+test("hidden active products remain eligible for offer orders", () => {
+    const hiddenBurger = product("burger", 800, { hidden: true });
+    const hiddenProducts = new Map([hiddenBurger, product("fries", 300)].map(row => [row.id, row]));
+
+    assert.doesNotThrow(() => priceBundle(makeOffer(), bundle(), hiddenProducts, now));
 });
 
 test("rejects inactive, expired and unstarted offers", () => {

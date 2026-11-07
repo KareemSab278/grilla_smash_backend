@@ -204,6 +204,7 @@ export const productCreateSchema = z.object({
     image_url: optionalText,
     sort_order: sortOrder.default(0),
     ingredients: z.array(name).default([]),
+    hidden: z.boolean().default(false),
     category_ids: z.array(id).default([]),
 });
 
@@ -214,12 +215,14 @@ export const productUpdateSchema = z.object({
     image_url: optionalText,
     sort_order: sortOrder.nullish(),
     ingredients: z.array(name).nullish(),
+    hidden: z.boolean().nullish(),
     active: z.boolean().nullish(),
     category_ids: z.array(id).nullish(),
 });
 
 export const productListQuerySchema = z.object({
     active_only: z.stringbool().default(false),
+    include_hidden: z.stringbool().default(false),
 });
 
 // ========================================

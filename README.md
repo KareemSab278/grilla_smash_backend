@@ -408,26 +408,31 @@ Body fields: `name`\*, `description`, `image_url`, `sort_order` (default 0). Upd
 
 ### 8.6 Products
 
-Products always come back with their `categories` array and `ingredients` array. `ingredients` lists the product ingredients customers may ask to remove.
+Products always come back with their `categories`, `ingredients`, and `hidden` fields. `ingredients` lists the product ingredients customers may ask to remove. `hidden` removes an active product from the regular storefront catalog without preventing it from being used in an offer.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/products` | All products. `?active_only=true` hides inactive ones |
-| GET | `/products/:productId` | One product |
+| GET | `/products` | All products. `?active_only=true` returns active, visible products |
+| GET | `/products/:productId` | One product; hidden products require `?include_hidden=true` |
 | POST | `/products` | Create |
 | PUT | `/products/:productId` | Partial update |
 | DELETE | `/products/:productId` | Delete (old orders keep their snapshot) |
 
-Body fields: `name`\*, `price`\* (pence), `description`, `image_url`, `sort_order` (default 0), `ingredients` (default `[]`, names customers may remove), `category_ids` (default `[]`, every id must exist, else 400). Update also takes `active`.
+Body fields: `name`\*, `price`\* (pence), `description`, `image_url`, `sort_order` (default 0), `ingredients` (default `[]`, names customers may remove), `hidden` (default `false`), `category_ids` (default `[]`, every id must exist, else 400). Update also takes `active`.
 
 `category_ids` on update **replaces** the whole list. Omit it to leave categories alone.
 `ingredients` on update also replaces the whole list; omit it to leave ingredients unchanged or
 send `[]` to clear the list.
+`hidden` on update is independent of `active`: set it to `true` to hide the product from regular
+storefront listings, or `false` to show it again. Offer product lists include hidden products.
+For an active product picker that includes hidden products (such as the offer editor), use
+`GET /products?active_only=true&include_hidden=true`. The single-product endpoint also supports
+`include_hidden=true` for admin editing.
 
 ```json
 {
   "id": "5dbf0d8e43d9", "name": "Classic Smash Burger", "price": 899,
-  "description": null, "image_url": null, "sort_order": 0, "ingredients": ["Lettuce", "Tomato"], "active": true,
+  "description": null, "image_url": null, "sort_order": 0, "ingredients": ["Lettuce", "Tomato"], "hidden": false, "active": true,
   "created_at": "2026-10-08T11:45:44.174Z", "updated_at": "2026-10-08T11:45:44.174Z",
   "categories": [ { "id": "7ebb0ca3980c", "name": "Burgers", "...": "..." } ]
 }
@@ -483,7 +488,7 @@ Lets a branch hide a product or charge a different price. `null` means "use the 
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/branches/:branchId/products` | Active products available at the branch, each with `branch_active`, `price_override` and `effective_price` |
+| GET | `/branches/:branchId/products` | Active, visible products available at the branch, each with `branch_active`, `price_override` and `effective_price`; accepts `?include_hidden=true` for admin views |
 | PUT | `/branches/:branchId/products/:productId` | Set the override (it is replaced as a whole) |
 | DELETE | `/branches/:branchId/products/:productId` | Remove the override |
 
@@ -491,7 +496,7 @@ PUT body: `{ "active": false }` and/or `{ "price_override": 799 }`. A product wi
 
 Branch availability now also honours `branches.unavailable_products`:
 
-- `GET /branches/:branchId/products` filters those ids out of the customer menu.
+- `GET /branches/:branchId/products` filters those ids and hidden products out of the customer menu. Use `?include_hidden=true` in admin views that need hidden products.
 - `POST /orders` rejects them again, even if someone submits the ids directly.
 - Managers can toggle them with the branch routes above.
 
@@ -588,6 +593,7 @@ Response (201):
 For each item, in this order:
 
 1. The product must exist (404), be `active`, and not be switched off for that branch (400).
+   Hidden products cannot be ordered as regular items, but may be ordered through an offer.
 2. Unit price = the branch's `price_override` if set, otherwise the product `price`, **plus** the price of each selected modifier.
 3. Every selected modifier must be active and belong to a group attached to *that* product (400 otherwise). Selecting the same modifier twice is rejected.
 4. For each attached group: the number selected must be at least `min_selections` (at least 1 if `required` and the group has available choices) and at most `max_selections` (400 otherwise).
