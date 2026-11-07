@@ -56,8 +56,8 @@ RETURNING *;
 
 // PRODUCTS
 const createProductQuery: string = `
-INSERT INTO products (id, name, description, price, image_url, sort_order, ingredients, hidden)
-VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8);
+INSERT INTO products (id, name, description, price, image_url, sort_order, ingredients, hidden, active)
+VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, $9);
 `;
 
 const linkProductCategoryQuery: string = `

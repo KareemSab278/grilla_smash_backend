@@ -205,6 +205,10 @@ Content-Type: application/json
 }
 ```
 
+`active` can also be set when creating a product (default `true`). An active, hidden product is
+available to use in offers while remaining absent from the regular customer catalog. An inactive
+product is excluded from offers and cannot be ordered.
+
 Send `false` to show it in the regular storefront catalog again. The field is returned in product
 responses and defaults to `false` on product creation. `GET /products?active_only=true` and
 `GET /branches/:branchId/products` omit hidden products by default; admin views that need them can

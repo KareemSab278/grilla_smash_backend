@@ -205,6 +205,7 @@ export const productCreateSchema = z.object({
     sort_order: sortOrder.default(0),
     ingredients: z.array(name).default([]),
     hidden: z.boolean().default(false),
+    active: z.boolean().default(true),
     category_ids: z.array(id).default([]),
 });
 

@@ -114,6 +114,7 @@ const createProduct = async (req: Request, res: Response<ProductResponse>): Prom
             data.sort_order,
             data.ingredients,
             data.hidden,
+            data.active,
         ]);
 
         await linkCategories(tx, productId, categoryIds);

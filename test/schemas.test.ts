@@ -129,6 +129,8 @@ test("product schemas accept and normalize removable ingredients", () => {
 test("product schemas default hidden to false and accept updates", () => {
     assert.equal(productCreateSchema.parse({ name: "Burger", price: 899 }).hidden, false);
     assert.equal(productCreateSchema.parse({ name: "Burger", price: 899, hidden: true }).hidden, true);
+    assert.equal(productCreateSchema.parse({ name: "Burger", price: 899 }).active, true);
+    assert.equal(productCreateSchema.parse({ name: "Burger", price: 899, active: false }).active, false);
     assert.equal(productUpdateSchema.parse({ hidden: true }).hidden, true);
 });
 

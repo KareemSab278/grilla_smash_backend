@@ -418,13 +418,14 @@ Products always come back with their `categories`, `ingredients`, and `hidden` f
 | PUT | `/products/:productId` | Partial update |
 | DELETE | `/products/:productId` | Delete (old orders keep their snapshot) |
 
-Body fields: `name`\*, `price`\* (pence), `description`, `image_url`, `sort_order` (default 0), `ingredients` (default `[]`, names customers may remove), `hidden` (default `false`), `category_ids` (default `[]`, every id must exist, else 400). Update also takes `active`.
+Body fields: `name`\*, `price`\* (pence), `description`, `image_url`, `sort_order` (default 0), `ingredients` (default `[]`, names customers may remove), `hidden` (default `false`), `active` (default `true`), `category_ids` (default `[]`, every id must exist, else 400). Update also takes `active`.
 
 `category_ids` on update **replaces** the whole list. Omit it to leave categories alone.
 `ingredients` on update also replaces the whole list; omit it to leave ingredients unchanged or
 send `[]` to clear the list.
 `hidden` on update is independent of `active`: set it to `true` to hide the product from regular
-storefront listings, or `false` to show it again. Offer product lists include hidden products.
+storefront listings, or `false` to show it again. Active hidden products remain eligible for offers;
+inactive products are excluded from offer product responses and cannot be added to an offer.
 For an active product picker that includes hidden products (such as the offer editor), use
 `GET /products?active_only=true&include_hidden=true`. The single-product endpoint also supports
 `include_hidden=true` for admin editing.

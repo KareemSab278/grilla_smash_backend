@@ -132,7 +132,10 @@ export const loadOffer = async (db: Db, offerId: string): Promise<OfferResponse>
 const validateRules = async (db: Db, rules: readonly OfferRuleInput[]): Promise<void> => {
     for (const rule of rules) {
         for (const productId of rule.product_ids) {
-            await getRequiredRow<ProductRow>(db, QUERIES.GET.PRODUCT_BY_ID, productId, "product");
+            const product = await getRequiredRow<ProductRow>(db, QUERIES.GET.PRODUCT_BY_ID, productId, "product");
+            if (!product.active) {
+                throw badRequest(`Product ${productId} is inactive and cannot be added to an offer.`);
+            }
         }
 
         const duplicateGroup = findDuplicate(rule.modifier_groups.map(group => group.modifier_group_id));

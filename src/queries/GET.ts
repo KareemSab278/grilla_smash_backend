@@ -84,6 +84,7 @@ JOIN offer_rules r
     ON r.id = orp.offer_rule_id
 JOIN products p
     ON p.id = orp.product_id
+    AND p.active
 WHERE ($1::text IS NULL OR r.offer_id = $1)
 ORDER BY p.sort_order, p.name;
 `;
