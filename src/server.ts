@@ -71,8 +71,8 @@ app.use(analytics);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const server = app.listen(CONFIG.port, CONFIG.host, () => {
-    console.log(`Server running on http://${CONFIG.host}:${CONFIG.port}`);
+const server = app.listen(CONFIG.port, () => {
+    console.log(`Server running on port: ${CONFIG.port}`);
 });
 
 // stop accepting requests, let in-flight ones finish, then close the connection pool
