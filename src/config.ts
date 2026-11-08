@@ -110,7 +110,7 @@ export const CONFIG: Config = {
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     branchSettingsAuthEnabled: parseBoolean(process.env.BRANCH_SETTINGS_AUTH_ENABLED, false),
     useStripe: parseBoolean(process.env.USE_STRIPE, true),
-    stripeSecretKey: requireEnv(DEV ? "STRIPE_SECRET_TEST_KEY" : "STRIPE_SECRET_KEY"),
+    stripeSecretKey: requireEnv("STRIPE_SECRET_KEY"),
     maxDeliveryDistanceKm: parseInteger("MAX_DELIVERY_DISTANCE_KM", process.env.MAX_DELIVERY_DISTANCE_KM, DEFAULT_MAX_DELIVERY_DISTANCE_KM, 1, 100),
     shift4SecretKey: process.env.SHIFT4_SECRET_KEY || undefined,
     googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || undefined,
