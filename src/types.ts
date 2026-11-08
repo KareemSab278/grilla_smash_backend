@@ -7,6 +7,8 @@
     Request body types are NOT here, they are inferred from the zod schemas in schemas.ts.
 */
 
+import type { MealUpgradeSnapshot } from "./payment/mealUpgradePricing";
+
 export type SqlParam = string | number | boolean | null | readonly string[] | readonly number[];
 
 export type OfferType = "FIXED_PRICE" | "PERCENTAGE" | "FIXED_DISCOUNT" | "BUY_X_GET_Y";
@@ -258,6 +260,7 @@ export type OrderItemRow = {
     total: number;
     notes: string | null;
     removed_ingredients: string[];
+    meal_upgrade: MealUpgradeSnapshot | null;
 };
 
 export type OrderItemModifierRow = {

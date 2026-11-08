@@ -9,22 +9,14 @@ import { QUERIES } from "../queries/queries";
 import sql, { dbGet } from "../database/db";
 import { sendEmail } from "./email";
 import { CONFIG } from "../config";
-
-type OrderStatusUpdates =
-    // "PENDING" |
-    "ACCEPTED"  |
-    "PREPARING" |
-    "READY"     |
-    // "COMPLETED" |
-    "CANCELLED" |
-    "REFUNDED";
+import type { OrderStatus } from "../types";
 
 type OrderEmailContent = {
     subject: string;
     body: string;
 };
 
-const ORDER_EMAIL_CONTENT: Partial<Record<OrderStatusUpdates, OrderEmailContent>> = {
+const ORDER_EMAIL_CONTENT: Partial<Record<OrderStatus, OrderEmailContent>> = {
     // PENDING: {
     //     subject: "Your order has been received",
     //     body: "has been received and is now being processed. We will notify you when it's ready. Thank you!",
@@ -55,7 +47,7 @@ const ORDER_EMAIL_CONTENT: Partial<Record<OrderStatusUpdates, OrderEmailContent>
     },
 };
 
-const sendOrderStatusEmail = async (orderId: string, status: OrderStatusUpdates): Promise<void> => {
+const sendOrderStatusEmail = async (orderId: string, status: OrderStatus): Promise<void> => {
     const content = ORDER_EMAIL_CONTENT[status];
     if (!content) return;
 
@@ -89,7 +81,7 @@ const sendOrderStatusEmail = async (orderId: string, status: OrderStatusUpdates)
     }
 };
 
-export const notifyOrderStatus = (orderId: string, status: OrderStatusUpdates): void => {
+export const notifyOrderStatus = (orderId: string, status: OrderStatus): void => {
     sendOrderStatusEmail(orderId, status).catch((err: unknown) => {
         console.error(`Order email failed (order ${orderId}, status ${status}):`, err);
     });

@@ -69,6 +69,7 @@ Money is always an **integer in pence** (`£8.99` is `899`). Ids are 12 characte
 4. Also run [`migrations/20261013_user_email_and_business_key.sql`](./migrations/20261013_user_email_and_business_key.sql) (adds `users.email` and `business.key_hash`). Then set the business key once, see [8.14](#814-users-and-password-reset).
 5. Run [`migrations/20261025_kds_notifications.sql`](./migrations/20261025_kds_notifications.sql) to add branch keys (if missing) and KDS device registrations.
 6. For analytics, run each statement of [`migrations/20261026_analytics_indexes.sql`](./migrations/20261026_analytics_indexes.sql) separately outside a transaction. The concurrent indexes support the analytics date and join lookups.
+7. [`migrations/20261107_meal_upgrades.sql`](./migrations/20261107_meal_upgrades.sql) adds the meal-upgrade configuration tables and an order-item snapshot column.
 
 ### 2.3 Configure
 
@@ -534,6 +535,35 @@ Validated before anything is written, otherwise 400 / 404: products, groups and 
 
 > Offers are applied when an order is created, see [Ordering an offer](#ordering-an-offer). A rule modifier group with no `modifier_ids` lists every active modifier of the group in responses.
 
+#### Meal upgrade configuration
+
+`GET /meal-upgrades` lists upgrades with their eligible main product IDs and nested groups and choices.
+`GET /meal-upgrades/:id` gets one; `POST /meal-upgrades` creates one;
+`PUT /meal-upgrades/:id` updates supplied fields; and `DELETE /meal-upgrades/:id` deletes one.
+Prices and surcharges are integer pence.
+
+```json
+{
+  "name": "Burger meal",
+  "upgrade_price": 350,
+  "active": true,
+  "sort_order": 0,
+  "main_product_ids": ["burger-id"],
+  "groups": [
+    { "name": "Side", "min_selections": 1, "max_selections": 1, "sort_order": 0,
+      "choices": [{ "product_id": "fries-id", "surcharge": 0, "sort_order": 0 }] },
+    { "name": "Drink", "min_selections": 1, "max_selections": 1, "sort_order": 1,
+      "choices": [{ "product_id": "drink-id", "surcharge": 100, "sort_order": 0 }] }
+  ]
+}
+```
+
+When `groups` is supplied on update, it replaces the group list. Include each existing group's `id` to
+preserve it; retained choices are identified by their product IDs and keep their choice IDs. Choices
+default to active on creation; omitting `active` on an existing choice preserves its state.
+The configuration endpoints are separate from offers, and follow the existing menu CRUD authorization behavior.
+The storefront can submit a meal snapshot with each main product; it is saved on the order item.
+
 ### 8.13 Orders
 
 | Method | Path | Description |
@@ -547,7 +577,10 @@ Both GET routes return `{ "orders": [ ... ] }`, each order with its `items`, eac
 
 #### Create an order
 
-The client sends **only ids and customer details**. It never sends prices or totals: the server prices the order from the database, so a tampered request cannot change what is charged (any `price` / `total` sent is ignored).
+The server prices mains, modifiers and offers from the database. A meal upgrade is different: the client
+submits its displayed name, price, selected products and surcharges as a snapshot. The backend adds those
+submitted amounts to the item price and stores the snapshot without verifying it against the current menu.
+The existing Stripe checkout also accepts the amount from the browser; it is not bound to a server-priced order.
 
 Body fields:
 
@@ -564,6 +597,7 @@ Body fields:
 | `items[].product_id` | yes | |
 | `items[].quantity` | yes | 1 to 99 |
 | `items[].modifier_ids` | no | Modifier ids, each at most once |
+| `items[].meal_upgrade` | no | Frontend snapshot: `id`, `name`, `price`, and `choices` with `id`, `group_id`, `group_name`, `product_id`, `product_name`, `surcharge` |
 | `items[].removed_ingredients` | no | Ingredient names from that product's `ingredients` list |
 | `items[].notes` | no | Up to 1000 characters |
 | `offers` | one of `items` / `offers` | Up to 50 bundles, see [Ordering an offer](#ordering-an-offer) |
@@ -657,7 +691,8 @@ curl -X POST http://localhost:8000/delivery/quote \
 
 Response: `{ "delivery_fee": 300, "distance_km": 2.4 }`. The fee is in pence: £3 minimum, covering up to 3 miles, plus 10p for each started 0.1 mile beyond that. The endpoint returns 400 if the address cannot be located or is outside the branch's delivery area. Use `delivery_fee` to display the checkout total and create the Stripe PaymentIntent. When `POST /orders` is submitted, the server recalculates the driving distance and fee and uses that value for the saved order and total; the client-provided `delivery_fee` is not trusted.
 
-`name`, `unit_price` and modifier `name` / `price` are snapshots taken at order time.
+`name`, `unit_price` and modifier `name` / `price` are snapshots taken at order time. Meal selections and
+their prices are saved in the order item's `meal_upgrade` JSON. Old orders without a meal contain `null`.
 
 ### 8.13.1 KDS push notifications
 

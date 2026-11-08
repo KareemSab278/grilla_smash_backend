@@ -12,5 +12,6 @@ generate_branch_key.ts
 !migrations/20261026_analytics_indexes.sql
 migrations/*.sql
 !migrations/20261106_branch_delivery_settings.sql
+!migrations/20261107_meal_upgrades.sql
 
 old-data.txt

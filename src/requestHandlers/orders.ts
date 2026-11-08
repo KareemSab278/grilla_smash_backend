@@ -6,9 +6,9 @@
     GET   /orders/history/:branchId   every order from the last 30 days, any status, newest first
     PATCH /orders/status              { id, status }
 
-    Pricing is done by the server, the client only sends ids.
+    Main products and modifiers are priced by the server. Meal upgrades are submitted as frontend snapshots.
 
-    Unit price = branch override or product price + selected modifiers.
+    Unit price = branch override or product price + selected modifiers + meal upgrade and surcharges.
 
     Product / modifier names and prices are copied onto the order (snapshots)
         so later menu edits never change old orders.
@@ -46,6 +46,7 @@ import { parseInput } from "../middleware/validate";
 import { loadAutomaticOffers, loadOffer } from "./offers";
 import { freeItems, priceBundle } from "../payment/offerPricing";
 import type { PricedBundle } from "../payment/offerPricing";
+import type { MealUpgradeSnapshot } from "../payment/mealUpgradePricing";
 import { deliveryQuoteSchema, orderCreateSchema, orderStatusUpdateSchema } from "../database/schemas";
 import type { OrderCreate } from "../database/schemas";
 import type {
@@ -158,6 +159,7 @@ type PricedItem = {
     notes: string | null;
     removedIngredients: string[];
     modifiers: PricedModifier[];
+    mealUpgrade?: MealUpgradeSnapshot;
 };
 
 // checks a product's selected modifiers against its attached groups (membership + min/max) and returns them
@@ -188,8 +190,8 @@ const resolveModifiers = (
     return selected.map(({ id, name, price }) => ({ id, name, price }));
 };
 
-// every price comes from the database (branch override first), nothing price-related is trusted from the client
-const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
+// Mains and modifiers use database prices; meal upgrades use the submitted basket snapshot.
+export const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
     const productIds = unique(data.items.map(item => item.product_id));
 
     const [products, groups, modifiers] = await Promise.all([
@@ -228,7 +230,10 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
 
         const unitPrice =
             (product.price_override ?? product.price) +
-            itemModifiers.reduce((sum, modifier) => sum + modifier.price, 0);
+            itemModifiers.reduce((sum, modifier) => sum + modifier.price, 0) +
+            (item.meal_upgrade
+                ? item.meal_upgrade.price + item.meal_upgrade.choices.reduce((sum, choice) => sum + choice.surcharge, 0)
+                : 0);
 
         return {
             productId: product.id,
@@ -241,6 +246,7 @@ const priceItems = async (db: Db, data: OrderCreate): Promise<PricedItem[]> => {
             notes: item.notes ?? null,
             removedIngredients,
             modifiers: itemModifiers,
+            mealUpgrade: item.meal_upgrade,
         };
     });
 };
@@ -309,7 +315,7 @@ const priceFreeItems = async (db: Db, items: readonly PricedItem[]): Promise<Pri
     );
 };
 
-const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]): Promise<void> => {
+export const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]): Promise<void> => {
     for (const item of items) {
         const itemId = newId();
 
@@ -325,6 +331,7 @@ const insertItems = async (db: Db, orderId: string, items: readonly PricedItem[]
             item.total,
             orNull(item.notes),
             item.removedIngredients,
+            item.mealUpgrade ? JSON.stringify(item.mealUpgrade) : null,
         ]);
 
         for (const modifier of item.modifiers) {

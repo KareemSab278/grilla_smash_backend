@@ -9,7 +9,7 @@
     - *CreateSchema   required fields + defaults
     - *UpdateSchema   every field optional, null / omitted means "leave unchanged"
     - money is an integer in pence (£8.99 = 899)
-    - unknown fields are stripped (e.g. a client sending its own price on an order is simply ignored)
+    - unknown fields are stripped; meal upgrades carry a frontend-provided price snapshot
 */
 
 import { z } from "zod";
@@ -331,8 +331,70 @@ export const offerUpdateSchema = z.object({
 });
 
 // ========================================
+// MEAL UPGRADES
+// ========================================
+
+const mealUpgradeChoiceSchema = z.object({
+    product_id: id,
+    surcharge: pence.default(0),
+    active: z.boolean().optional(),
+    sort_order: sortOrder.default(0),
+});
+
+const mealUpgradeGroupSchema = z.object({
+    id: id.optional(),
+    name,
+    min_selections: z.int().min(0).default(1),
+    max_selections: z.int().min(1).default(1),
+    sort_order: sortOrder.default(0),
+    choices: z.array(mealUpgradeChoiceSchema).min(1).max(200),
+}).superRefine((group, ctx) => {
+    if (group.min_selections > group.max_selections || group.min_selections > group.choices.length) {
+        ctx.addIssue({ code: "custom", message: "Invalid selection limits" });
+    }
+    if (new Set(group.choices.map(choice => choice.product_id)).size !== group.choices.length) {
+        ctx.addIssue({ code: "custom", message: "A product may only appear once in a group" });
+    }
+});
+
+const mealUpgradeFields = {
+    name,
+    upgrade_price: pence,
+    active: z.boolean().default(true),
+    sort_order: sortOrder.default(0),
+    main_product_ids: z.array(id).min(1).max(200),
+    groups: z.array(mealUpgradeGroupSchema).min(1).max(50),
+};
+
+const validateMealUpgrade = (data: {
+    main_product_ids?: string[];
+    groups?: { id?: string }[];
+}, ctx: z.RefinementCtx): void => {
+    if (data.main_product_ids && new Set(data.main_product_ids).size !== data.main_product_ids.length) {
+        ctx.addIssue({ code: "custom", message: "Duplicate eligible mains" });
+    }
+    const ids = data.groups?.flatMap(group => group.id ? [group.id] : []) ?? [];
+    if (new Set(ids).size !== ids.length) {
+        ctx.addIssue({ code: "custom", message: "Duplicate group IDs" });
+    }
+};
+
+export const mealUpgradeCreateSchema = z.object(mealUpgradeFields).superRefine(validateMealUpgrade);
+export const mealUpgradeUpdateSchema = z.object({
+    name: name.optional(),
+    upgrade_price: pence.optional(),
+    active: z.boolean().optional(),
+    sort_order: sortOrder.optional(),
+    main_product_ids: z.array(id).min(1).max(200).optional(),
+    groups: z.array(mealUpgradeGroupSchema).min(1).max(50).optional(),
+}).superRefine(validateMealUpgrade);
+
+export type MealUpgradeCreate = z.infer<typeof mealUpgradeCreateSchema>;
+export type MealUpgradeUpdate = z.infer<typeof mealUpgradeUpdateSchema>;
+
+// ========================================
 // ORDERS
-// Prices are never accepted from the client, the server prices every order from the database
+// Mains and modifiers are priced from the database; meal upgrades carry the frontend snapshot.
 // ========================================
 
 export const ORDER_TYPES = ["PICKUP", "DELIVERY"] as const;
@@ -348,12 +410,27 @@ export const deliveryQuoteSchema = z.object({
     postcode: name,
 });
 
+const orderMealUpgradeSchema = z.object({
+    id,
+    name,
+    price: pence,
+    choices: z.array(z.object({
+        id,
+        group_id: id,
+        group_name: name,
+        product_id: id,
+        product_name: name,
+        surcharge: pence,
+    })).min(1).max(200),
+});
+
 const orderItemSchema = z.object({
     product_id: id,
     quantity: z.int().min(1).max(99),
     notes: z.string().trim().max(1000).nullish(),
     modifier_ids: z.array(id).default([]),
     removed_ingredients: z.array(name).default([]),
+    meal_upgrade: orderMealUpgradeSchema.optional(),
 });
 
 // one bundle: the offer plus the products (and modifiers) picked for each of its rules

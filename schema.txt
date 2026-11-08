@@ -208,11 +208,43 @@ CREATE TABLE public.order_items (
   total integer NOT NULL,
   notes text,
   removed_ingredients ARRAY NOT NULL DEFAULT '{}'::text[],
+  meal_upgrade jsonb CHECK (meal_upgrade IS NULL OR jsonb_typeof(meal_upgrade) = 'object'),
   CONSTRAINT order_items_pkey PRIMARY KEY (id),
   CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
   CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
   CONSTRAINT order_items_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.offers(id),
   CONSTRAINT order_items_offer_rule_id_fkey FOREIGN KEY (offer_rule_id) REFERENCES public.offer_rules(id)
+);
+CREATE TABLE public.meal_upgrades (
+  id text PRIMARY KEY,
+  name text NOT NULL,
+  price integer NOT NULL CHECK (price >= 0),
+  active boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE TABLE public.meal_upgrade_mains (
+  meal_upgrade_id text NOT NULL REFERENCES public.meal_upgrades(id) ON DELETE CASCADE,
+  product_id text NOT NULL REFERENCES public.products(id),
+  PRIMARY KEY (meal_upgrade_id, product_id)
+);
+CREATE TABLE public.meal_upgrade_groups (
+  id text PRIMARY KEY,
+  meal_upgrade_id text NOT NULL REFERENCES public.meal_upgrades(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  min_selections integer NOT NULL DEFAULT 1 CHECK (min_selections >= 0),
+  max_selections integer NOT NULL DEFAULT 1 CHECK (max_selections >= 1 AND max_selections >= min_selections),
+  sort_order integer NOT NULL DEFAULT 0
+);
+CREATE TABLE public.meal_upgrade_choices (
+  id text PRIMARY KEY,
+  group_id text NOT NULL REFERENCES public.meal_upgrade_groups(id) ON DELETE CASCADE,
+  product_id text NOT NULL REFERENCES public.products(id),
+  surcharge integer NOT NULL DEFAULT 0 CHECK (surcharge >= 0),
+  active boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  UNIQUE (group_id, product_id)
 );
 CREATE TABLE public.order_item_modifiers (
   id text NOT NULL,

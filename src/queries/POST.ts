@@ -153,8 +153,8 @@ DO UPDATE SET
 `;
 
 const createOrderItemQuery: string = `
-INSERT INTO order_items (id, order_id, product_id, offer_id, offer_rule_id, name, quantity, unit_price, total, notes, removed_ingredients)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[]);
+INSERT INTO order_items (id, order_id, product_id, offer_id, offer_rule_id, name, quantity, unit_price, total, notes, removed_ingredients, meal_upgrade)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[], $12::text::jsonb);
 `;
 
 const createOrderOfferQuery: string = `
