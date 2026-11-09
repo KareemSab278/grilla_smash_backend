@@ -17,8 +17,11 @@ if (existsSync(ENV_PATH)) {
 }
 
 const EMAIL_FROM_DEFAULT = "test_business <grillasmash@gmail.com>";
+const BUSINESS_NAME_DEFAULT = "test_business";
+
 const EMAIL_FROM_PATTERN = /^(?:[^<>]+<[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+>|[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)$/;
 const EMAIL_FROM = process.env.EMAIL_FROM?.trim() || EMAIL_FROM_DEFAULT;
+const BUSINESS_NAME = process.env.BUSINESS_NAME?.trim() || BUSINESS_NAME_DEFAULT;
 if (!EMAIL_FROM_PATTERN.test(EMAIL_FROM)) {
     throw new Error("Invalid EMAIL_FROM; use email@example.com or Name <email@example.com>");
 }
@@ -49,6 +52,7 @@ type Config = {
     readonly shift4SecretKey: string | undefined;
     readonly resendApiKey: string;
     readonly emailFrom: string;
+    readonly businessName: string;
 };
 
 const parseInteger = (name: string, raw: string | undefined, fallback: number, min: number, max: number): number => {
@@ -104,6 +108,7 @@ export const CONFIG: Config = {
     isDevelopment: DEV,
     port: parseInteger("PORT", process.env.PORT, DEFAULT_PORT, 0, 65535),
     host: process.env.HOST || DEFAULT_HOST,
+    businessName: BUSINESS_NAME,
     databaseUrl: getDatabaseUrl(),
     dbPoolMax: parseInteger("DB_POOL_MAX", process.env.DB_POOL_MAX, DEFAULT_DB_POOL_MAX, 1, 100),
     supabaseUrl: process.env.SUPABASE_URL || undefined,

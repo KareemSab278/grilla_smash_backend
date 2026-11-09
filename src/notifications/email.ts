@@ -9,7 +9,7 @@
 import { Resend } from "resend";
 import { CONFIG } from "../config";
 
-const BRAND_NAME = "test_business";
+const BRAND_NAME = CONFIG.businessName;
 
 const resend = new Resend(CONFIG.resendApiKey);
 
