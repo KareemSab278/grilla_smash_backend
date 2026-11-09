@@ -75,6 +75,7 @@ const createDeps = (state: State, secondLimit = 30, minuteLimit = 100): RateLimi
     setBlockedUntil: timestamp => {
         state.blockedUntil = timestamp;
     },
+    blockDurationMs: 6_000,
 });
 
 test("rejects the 31st request within one second and blocks globally", async () => {

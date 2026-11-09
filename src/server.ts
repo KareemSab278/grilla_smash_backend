@@ -19,6 +19,7 @@ import { CONFIG } from "./config";
 import { closeDb } from "./database/db";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter";
+import startCustomerDataPurgeLoop from "./purge";
 
 import health from "./requestHandlers/health";
 import business from "./requestHandlers/business";
@@ -74,6 +75,8 @@ app.use(errorHandler);
 const server = app.listen(CONFIG.port, () => {
     console.log(`Server running on port: ${CONFIG.port}`);
 });
+
+void startCustomerDataPurgeLoop();
 
 // stop accepting requests, let in-flight ones finish, then close the connection pool
 const shutdown = (signal: string): void => {

@@ -82,6 +82,7 @@ SUPABASE_DB_URL=postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>
 DB_POOL_MAX=10
 CORS_ORIGINS=*
 BRANCH_SETTINGS_AUTH_ENABLED=false
+PURGE_INTERVAL_HRS=12
 STRIPE_SECRET_TEST_KEY=sk_test_...
 RESEND_API_KEY=re_...
 ```
@@ -123,6 +124,7 @@ Read once at startup by [`src/config.ts`](./src/config.ts). A missing or invalid
 | `PORT` | no | `8000` | Integer 0 to 65535. |
 | `HOST` | no | `127.0.0.1` | Interface to bind. Use `0.0.0.0` in a container. |
 | `DB_POOL_MAX` | no | `10` | Max pooled connections, integer 1 to 100. |
+| `PURGE_INTERVAL_HRS` | no | `12` | Minimum hours between customer-data purges per branch (integer 1–720). The scheduler checks once an hour, starting one hour after startup. Each branch is purged during its closed hours in `Europe/London`; if the next closed time is over 12 hours away, its purge runs immediately. |
 | `CORS_ORIGINS` | no | `127.0.0.1` / `localhost` on ports 3000 and 3001 | Comma separated list of allowed browser origins, or `*` to allow any browser origin in dev. |
 | `BRANCH_SETTINGS_AUTH_ENABLED` | no | `false` | Turn branch-setting auth on when you have users/roles wired in. Leave it off for local development. |
 | `STRIPE_SECRET_TEST_KEY` | yes | none | Stripe secret key. Stripe is the default payment provider. |

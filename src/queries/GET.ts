@@ -30,6 +30,7 @@ ORDER BY email;
 
 // BRANCHES
 const getBranchesQuery: string = `SELECT * FROM branches ORDER BY name;`;
+const getBranchPurgeHoursQuery: string = `SELECT id, opening_hours::text AS opening_hours FROM branches ORDER BY id;`;
 
 const getBranchByIdQuery: string = `SELECT * FROM branches WHERE id = $1;`;
 
@@ -300,6 +301,7 @@ export const GET = {
         BUSINESS_KEY_HASH: getBusinessKeyHashQuery,
 
         BRANCHES: getBranchesQuery,
+        BRANCH_PURGE_HOURS: getBranchPurgeHoursQuery,
         BRANCH_BY_ID: getBranchByIdQuery,
         ACTIVE_BRANCH_BY_KEY: getActiveBranchByKeyQuery,
         ACTIVE_KDS_NOTIFICATIONS: getActiveKdsNotificationsQuery,

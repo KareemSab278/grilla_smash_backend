@@ -24,6 +24,7 @@ export type RateLimiterDeps = {
     getNow: () => number;
     getBlockedUntil: () => number;
     setBlockedUntil: (timestamp: number) => void;
+    blockDurationMs: number;
 };
 
 let blockedUntil = 0;
@@ -46,12 +47,13 @@ const defaultDeps: RateLimiterDeps = {
     setBlockedUntil: timestamp => {
         blockedUntil = timestamp;
     },
+    blockDurationMs: BLOCK_DURATION_MS,
 };
 
 const isRateLimiterRes = (value: unknown): value is RateLimiterRes => value instanceof RateLimiterRes;
 
 const activateGlobalBlock = (dependencies: RateLimiterDeps): number => {
-    const expiry = Math.max(dependencies.getBlockedUntil(), dependencies.getNow() + BLOCK_DURATION_MS);
+    const expiry = Math.max(dependencies.getBlockedUntil(), dependencies.getNow() + dependencies.blockDurationMs);
     dependencies.setBlockedUntil(expiry);
     return Math.max(1, Math.ceil((expiry - dependencies.getNow()) / 1000));
 };

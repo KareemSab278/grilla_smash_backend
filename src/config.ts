@@ -28,6 +28,7 @@ const DEFAULT_PORT = Number(process.env.DEFAULT_PORT ?? 8000);
 const DEFAULT_HOST = process.env.DEFAULT_HOST ?? "127.0.0.1";
 const DEFAULT_DB_POOL_MAX = Number(process.env.DEFAULT_DB_POOL_MAX ?? 10);
 const DEFAULT_MAX_DELIVERY_DISTANCE_KM = Number(process.env.MAX_DELIVERY_DISTANCE_KM ?? 8);
+const DEFAULT_PURGE_INTERVAL_HRS = 12;
 
 type Config = {
     readonly isDevelopment: boolean;
@@ -43,6 +44,7 @@ type Config = {
     readonly branchSettingsAuthEnabled: boolean;
     readonly useStripe: boolean;
     readonly maxDeliveryDistanceKm: number;
+    readonly purgeIntervalHrs: number;
     readonly stripeSecretKey: string;
     readonly shift4SecretKey: string | undefined;
     readonly resendApiKey: string;
@@ -112,6 +114,7 @@ export const CONFIG: Config = {
     useStripe: parseBoolean(process.env.USE_STRIPE, true),
     stripeSecretKey: requireEnv("STRIPE_SECRET_KEY"),
     maxDeliveryDistanceKm: parseInteger("MAX_DELIVERY_DISTANCE_KM", process.env.MAX_DELIVERY_DISTANCE_KM, DEFAULT_MAX_DELIVERY_DISTANCE_KM, 1, 100),
+    purgeIntervalHrs: parseInteger("PURGE_INTERVAL_HRS", process.env.PURGE_INTERVAL_HRS, DEFAULT_PURGE_INTERVAL_HRS, 1, 720),
     shift4SecretKey: process.env.SHIFT4_SECRET_KEY || undefined,
     googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || undefined,
     resendApiKey: requireEnv("RESEND_API_KEY"),
